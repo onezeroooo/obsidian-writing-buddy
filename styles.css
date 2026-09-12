@@ -1,0 +1,2626 @@
+/*
+ * WritingBuddy / 墨伴
+ *
+ * Built on Obsidian's own CSS variables so the panel inherits the writer's
+ * theme. The hierarchy this is trying to produce, in order:
+ *
+ *   1. assistant prose
+ *   2. the passage under discussion
+ *   3. everything else — controls, metadata, status
+ *
+ * Two corrections from the first pass are load-bearing here. Density: this is a
+ * manuscript tool, so spacing is tighter than a consumer chat app — a writer
+ * needs more long Chinese prose on screen at once. And surfaces: large grey
+ * cards and washed-out block backgrounds are gone, so assistant text reads like
+ * document text rather than content inside a dashboard. Purple is an accent
+ * only.
+ */
+
+.wb-root {
+	/*
+	 * The accent is the reader's, not ours.
+	 *
+	 * This was a hardcoded violet, which meant the plugin ignored the colour the
+	 * writer picked in Appearance and clashed with any theme that had its own.
+	 * `--interactive-accent` is the one Obsidian exposes as adjustable, so
+	 * everything tinted here — the status breath, the quoted passage, the source
+	 * links, selected states — follows it.
+	 */
+	--wb-accent: var(--interactive-accent);
+	--wb-gutter: 11px;
+	--wb-radius: 7px;
+
+	/*
+	 * Density is set here in absolute terms rather than inherited from the
+	 * theme's UI scale, because this panel has a job the theme does not know
+	 * about: hold as much long Chinese prose on screen as a writer can read at
+	 * once. 13.5px with a 1.75 line-height is a comfortable reading size for
+	 * Han characters while fitting roughly a third more text per screen than
+	 * the previous sizing. Metadata drops to 11.5px, where it reads as
+	 * annotation rather than as content.
+	 */
+	/*
+	 * One step up for reading text, unchanged for everything else. The panel is
+	 * read for long stretches; the metadata beside it is glanced at.
+	 */
+	--wb-font-body: 14.5px;
+	--wb-font-ui: 12.5px;
+	--wb-font-meta: 11.5px;
+	--wb-line: 1.78;
+	--wb-msg-gap: 14px;
+
+	/*
+	 * One width system for the whole panel.
+	 *
+	 * A fixed 46rem cap left most of a wide pane empty while the text stayed in
+	 * a column down the middle. This grows with the pane and stops at a line
+	 * length that is still comfortable to read — every part of the conversation
+	 * uses the same value, so nothing is narrower than the thing above it.
+	 */
+	--wb-content-width: min(100%, 62rem);
+
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	font-size: var(--wb-font-ui);
+
+	/*
+	 * Obsidian's app chrome is `user-select: none`, and a custom `ItemView`
+	 * inherits that — so the entire conversation could be read and not copied.
+	 * For a tool whose whole content is prose, that is a serious bug: a writer
+	 * wants to lift a sentence out of an answer.
+	 *
+	 * Selection is enabled for the panel and switched off again only on the
+	 * controls, where dragging across a button and highlighting its label is
+	 * noise rather than a feature.
+	 */
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+.wb-root button,
+.wb-root .wb-param-label,
+.wb-root .wb-status,
+.wb-root .wb-brand,
+.wb-root .wb-subtitle,
+.wb-history-modal button {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* …but the answer and the diff are selectable text. */
+.wb-msg-text,
+.wb-diff-body {
+	user-select: text;
+	-webkit-user-select: text;
+	cursor: text;
+}
+
+/*
+ * The quoted passage is a control, not text.
+ *
+ * It exists to be pressed — it takes you to that passage in the manuscript —
+ * so the whole block is one target with a pointer, and dragging across it
+ * selects nothing. The prose it quotes remains selectable in the manuscript.
+ */
+.wb-citation,
+.wb-citation-body,
+.wb-citation-text {
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: pointer;
+}
+
+/* ------------------------------------------------------ shared controls */
+
+/*
+ * Every button in this plugin starts from nothing.
+ *
+ * Obsidian's base button is a filled, bordered, shadowed rectangle with a fixed
+ * height. Two things went wrong with only partially opting out of it. The fixed
+ * height made any button with stacked content overflow and collide with its
+ * neighbour, which is what broke the history modal. And the fill kept showing
+ * through on controls that were supposed to be quiet — `＋`, history, `⋯`,
+ * 分支 — because each of those styled its own background without clearing the
+ * base one underneath.
+ *
+ * So the reset is total and lives in one place: no background, no border, no
+ * shadow, no imposed height. Anything that wants a surface asks for it, and
+ * hover is where a control becomes visible rather than at rest.
+ *
+ * Its specificity has to be high enough to win, and it went too low twice.
+ *
+ * `:where(scope) button` is (0,0,1) and `:where(scope) :where(button)` is
+ * (0,0,0); Obsidian styles buttons more specifically than either, so the reset
+ * simply never applied and every control in the plugin — `＋`, history, `⋯`,
+ * 分支, 详情, the writing actions, the parameter values — kept its white box.
+ *
+ * `.wb-root button` (0,1,1) does beat it. The cost is that it also beats a
+ * plain component class, so the two controls that genuinely need a surface at
+ * rest say so at (0,2,0) instead. Hover rules are (0,1,1) too and win on load
+ * order, which is why hover borders still work.
+ */
+.wb-root button,
+.wb-history-modal button {
+	height: auto;
+	min-height: 0;
+	line-height: normal;
+	text-align: inherit;
+	background: transparent;
+	background-color: transparent;
+	border: 1px solid transparent;
+	box-shadow: none;
+	color: inherit;
+}
+
+.wb-root button:hover,
+.wb-history-modal button:hover {
+	box-shadow: none;
+}
+
+/*
+ * The history rows, explicitly.
+ *
+ * Obsidian styles buttons inside a modal more specifically than it styles them
+ * elsewhere, so the reset above cannot be relied on to reach them — and a list
+ * of forty conversations each in its own box is the least readable thing this
+ * plugin has produced.
+ */
+.wb-history-modal .wb-history-open,
+.wb-history-modal .wb-history-open:hover,
+.wb-history-modal .wb-history-twisty,
+.wb-history-modal .wb-history-twisty:hover {
+	border: none;
+	background: transparent;
+	background-color: transparent;
+	box-shadow: none;
+}
+
+/* Focus stays visible: the reset removes decoration, not accessibility. */
+.wb-root button:focus-visible,
+.wb-history-modal button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+.wb-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.wb-icon-btn:hover {
+	border-color: var(--background-modifier-border-hover);
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.wb-icon-btn .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.wb-icon-btn.is-disabled {
+	opacity: 0.35;
+	pointer-events: none;
+}
+
+/*
+ * Secondary controls are transparent until you reach for them.
+ *
+ * Obsidian's default button is a filled light rectangle. A panel with a dozen
+ * of them reads as a control surface that happens to contain text, which is the
+ * wrong way round for a writing tool. So: nothing by default, a hairline and
+ * the faintest surface on hover, and a tinted surface only for a genuinely
+ * selected state.
+ */
+.wb-btn {
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 2px 9px;
+	border-radius: var(--radius-s);
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.wb-btn:hover:not(:disabled) {
+	border-color: var(--background-modifier-border-hover);
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.wb-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.wb-btn.is-selected,
+.wb-btn[aria-pressed="true"] {
+	border-color: color-mix(in srgb, var(--wb-accent) 40%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+	color: var(--text-normal);
+}
+
+/* ---------------------------------------------------------------- header */
+
+.wb-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px var(--wb-gutter) 4px;
+}
+
+.wb-identity {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	flex: 1;
+}
+
+.wb-brand-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--wb-accent) 15%, transparent);
+	color: var(--wb-accent);
+	flex-shrink: 0;
+}
+
+.wb-brand-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.wb-identity-text {
+	min-width: 0;
+	line-height: 1.25;
+}
+
+.wb-brand {
+	font-weight: 600;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wb-subtitle {
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wb-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+	flex-shrink: 0;
+	position: relative;
+	cursor: pointer;
+}
+
+.wb-status-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--wb-accent);
+	flex-shrink: 0;
+}
+
+.wb-status.is-loading .wb-status-dot,
+.wb-status.is-working .wb-status-dot {
+	animation: wb-pulse 1.4s ease-in-out infinite;
+}
+
+/*
+ * Idle is not asleep — and it has to be visible enough to notice.
+ *
+ * The first attempt at this was so subtle nobody could tell it was moving. It
+ * now breathes across a real range of size and opacity, with a soft halo, on a
+ * period slow enough that it never reads as a loading spinner.
+ */
+.wb-status.is-all .wb-status-dot {
+	background: var(--text-success, #3aa675);
+	animation: wb-breathe 3.4s ease-in-out infinite;
+}
+
+.wb-status.is-empty .wb-status-dot {
+	background: var(--text-faint);
+	animation: none;
+}
+
+.wb-status.is-unknown .wb-status-dot {
+	background: var(--text-muted);
+	animation: none;
+}
+
+.wb-status.is-none .wb-status-dot,
+.wb-status.is-local-error .wb-status-dot {
+	background: var(--text-error);
+	animation: none;
+}
+
+.wb-status.is-partial .wb-status-dot {
+	background: var(--text-warning, #d99a32);
+}
+
+.wb-connection-popover {
+	--wb-font-ui: 12.5px;
+	--wb-font-meta: 11.5px;
+	position: fixed;
+	z-index: var(--layer-popover, 1000);
+	max-height: calc(100vh - 24px);
+	overflow-y: auto;
+	padding: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 9px;
+	background: var(--background-primary);
+	box-shadow: var(--shadow-s);
+}
+
+.wb-connection-popover-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 6px 7px;
+}
+
+.wb-connection-health-dot {
+	width: 7px;
+	height: 7px;
+	margin-top: 5px;
+	border-radius: 50%;
+	background: var(--text-faint);
+	flex-shrink: 0;
+}
+
+.wb-connection-health-dot.is-connected { background: var(--text-success, #3aa675); }
+.wb-connection-health-dot.is-checking { background: var(--wb-accent); }
+.wb-connection-health-dot.is-offline,
+.wb-connection-health-dot.is-auth-error,
+.wb-connection-health-dot.is-unavailable { background: var(--text-error); }
+
+.wb-connection-popover-text { min-width: 0; }
+.wb-connection-popover-name { color: var(--text-normal); font-size: var(--wb-font-ui); line-height: 1.35; }
+.wb-connection-popover-detail,
+.wb-connection-popover-empty { color: var(--text-muted); font-size: var(--wb-font-meta); line-height: 1.4; }
+
+@keyframes wb-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.25; }
+}
+
+@keyframes wb-breathe {
+	0%, 100% {
+		opacity: 0.45;
+		transform: scale(0.82);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--wb-accent) 0%, transparent);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1.3);
+		box-shadow: 0 0 6px 2px color-mix(in srgb, var(--wb-accent) 32%, transparent);
+	}
+}
+
+/* Motion is decoration here; anyone who has asked for less gets none. */
+@media (prefers-reduced-motion: reduce) {
+	.wb-status-dot,
+	.wb-activity-pulse {
+		animation: none !important;
+	}
+}
+
+/* ---------------------------------------------------------- session bar */
+
+/*
+ * Set well below the product header and given room of its own, so it reads as
+ * "which conversation am I in" rather than as a second heading competing with
+ * the product name.
+ */
+.wb-session-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 10px var(--wb-gutter) 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.wb-title-icon {
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-faint);
+	flex-shrink: 0;
+	margin-right: 5px;
+}
+
+.wb-title-icon .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+.wb-title-wrap {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+
+/*
+ * A title, not a control: no border, no background, no pointer. Clicking it
+ * must not feel like it will navigate somewhere — history has its own icon.
+ */
+/*
+ * Quieter than a page heading, but not quieter than the conversation.
+ *
+ * It had been pushed all the way to muted 12.5px, which left it smaller and
+ * fainter than the answers underneath — and it is the one thing on screen that
+ * says which conversation you are in.
+ */
+.wb-title {
+	font-size: 13.5px;
+	font-weight: 500;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+.wb-title-empty {
+	color: var(--text-faint);
+	font-weight: 400;
+}
+
+.wb-title-input {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--wb-font-ui);
+	font-weight: 400;
+	padding: 1px 6px;
+}
+
+/*
+ * Recessed until the row is hovered, but always focusable for keyboards.
+ *
+ * Both title tools — rename by hand, rename from the discussion — live here,
+ * beside the title they act on, and appear together.
+ */
+.wb-title-tool {
+	width: 20px;
+	height: 20px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.wb-title-tool .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.wb-session-bar:hover .wb-title-tool,
+.wb-title-tool:focus-visible {
+	opacity: 1;
+}
+
+/* The generated one is the accent action of the pair. */
+.wb-title-wand:hover {
+	color: var(--wb-accent);
+}
+
+.wb-session-actions {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	padding: 2px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+	flex-shrink: 0;
+}
+
+/* The three top-level actions form one compact control group. */
+.wb-root .wb-session-action {
+	width: 28px;
+	height: 28px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--text-muted);
+	transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.wb-root .wb-session-action:hover {
+	border-color: color-mix(in srgb, var(--wb-accent) 18%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+	color: var(--wb-accent);
+}
+
+.wb-root .wb-session-action:active {
+	transform: translateY(1px);
+}
+
+.wb-session-action .svg-icon {
+	width: 15px;
+	height: 15px;
+	stroke-width: 1.8;
+}
+
+/* New conversation is the primary action, without turning into a loud button. */
+.wb-root .wb-session-action-new {
+	background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+	color: var(--wb-accent);
+}
+
+/* --------------------------------------------------------------- thread */
+
+.wb-scroll {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.wb-thread {
+	display: flex;
+	flex-direction: column;
+	gap: var(--wb-msg-gap);
+	padding: 12px var(--wb-gutter) 4px;
+	max-width: var(--wb-content-width);
+	margin: 0 auto;
+	width: 100%;
+}
+
+.wb-notice,
+.wb-empty {
+	padding: 26px 4px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.wb-notice-title,
+.wb-empty-title {
+	font-size: var(--wb-font-body);
+	color: var(--text-normal);
+	margin-bottom: 5px;
+}
+
+.wb-notice-body,
+.wb-empty-body {
+	line-height: 1.7;
+	font-size: var(--wb-font-meta);
+}
+
+/* -------------------------------------------------------------- message */
+
+.wb-msg {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.wb-msg-text {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	color: var(--text-normal);
+}
+
+/* Assistant prose is the point of the panel, and carries no container at all. */
+.wb-msg-assistant .wb-msg-text {
+	font-size: var(--wb-font-body);
+	line-height: var(--wb-line);
+}
+
+.wb-msg-user {
+	align-items: flex-end;
+}
+
+/* A light tint, not a grey card. */
+.wb-msg-user .wb-msg-text {
+	/* The writer's own words, tinted with the colour they chose. */
+	background: color-mix(in srgb, var(--wb-accent) 10%, var(--background-primary));
+	border-radius: var(--wb-radius);
+	padding: 5px 10px;
+	max-width: 88%;
+	font-size: var(--wb-font-body);
+	line-height: 1.65;
+}
+
+.wb-msg-user .wb-msg-attachment {
+	max-width: 88%;
+}
+
+.wb-msg-error {
+	color: var(--text-error);
+	font-size: var(--wb-font-meta);
+	line-height: 1.6;
+	padding-left: 8px;
+	border-left: 2px solid var(--text-error);
+}
+
+/*
+ * `运行过程` on the left, `分支` on the far right — the message-level action
+ * belongs at the trailing edge.
+ *
+ * The row is **always visible** and always the same height. 分支 is navigation:
+ * a hover-only branch button is one most people never discover, and one that
+ * moves when a disclosure opens takes the click meant for it. The expanded
+ * disclosure renders into `.wb-msg-details` below, so nothing on this row can
+ * be displaced by it.
+ */
+.wb-msg-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-height: 20px;
+}
+
+.wb-msg-details:empty {
+	display: none;
+}
+
+.wb-msg-footer-left {
+	min-width: 0;
+	flex: 1;
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+/*
+ * When the reply was written, beside how long it took.
+ *
+ * Quieter than the disclosure next to it: the disclosure is a control, this is
+ * a fact you read without acting on. It never wraps — a footer that reflows
+ * because a label grew from `刚刚` to a date would move the buttons under the
+ * writer's cursor.
+ */
+.wb-msg-time {
+	flex: 0 0 auto;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+}
+
+.wb-msg-footer-right {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+/* A failed Full run has one durable recovery action. It stays visible because
+ * it is the primary way to finish that turn, not incidental message chrome. */
+.wb-full-resume-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 24px;
+	padding: 2px 9px;
+	border: 1px solid color-mix(in srgb, var(--wb-accent) 32%, var(--background-modifier-border));
+	border-radius: var(--radius-s);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+	color: var(--wb-accent);
+	font-size: var(--wb-font-meta);
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.wb-full-resume-btn:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--wb-accent) 16%, transparent);
+}
+
+.wb-full-resume-btn:focus-visible {
+	outline: 2px solid var(--wb-accent);
+	outline-offset: 1px;
+}
+
+.wb-full-resume-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+/*
+ * Message-level actions are the quietest thing on screen.
+ *
+ * They sit next to prose that is the point of the panel, so at rest they are
+ * barely there — and they still have to be *there*, because 分支 is navigation
+ * and hiding it until hover is how nobody finds it.
+ */
+.wb-ghost-btn,
+.wb-activity-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 1px 6px;
+	border-radius: var(--radius-s);
+	color: var(--text-faint);
+	opacity: 0;
+	pointer-events: none;
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+/* Message actions stay out of the reading surface until that answer is being
+ * interacted with. Focus-within keeps them reachable by keyboard, and an open
+ * details disclosure keeps its own toggle visible. */
+.wb-msg-assistant:hover .wb-ghost-btn,
+.wb-msg-assistant:hover .wb-activity-toggle,
+.wb-msg-assistant:focus-within .wb-ghost-btn,
+.wb-msg-assistant:focus-within .wb-activity-toggle,
+.wb-activity-toggle.is-expanded {
+	opacity: 0.72;
+	pointer-events: auto;
+}
+
+.wb-ghost-btn:hover,
+.wb-activity-toggle:hover {
+	opacity: 1;
+	border-color: color-mix(in srgb, var(--wb-accent) 18%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+	color: var(--wb-accent);
+}
+
+.wb-ghost-btn:active,
+.wb-activity-toggle:active {
+	transform: translateY(1px);
+}
+
+.wb-ghost-btn:focus-visible,
+.wb-activity-toggle:focus-visible {
+	outline: 2px solid var(--wb-accent);
+	outline-offset: 1px;
+}
+
+/* Expanded is a state worth seeing, and still secondary to the answer. */
+.wb-activity-toggle.is-expanded {
+	opacity: 1;
+	border-color: color-mix(in srgb, var(--wb-accent) 18%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+	color: var(--wb-accent);
+}
+
+@media (hover: none) {
+	.wb-ghost-btn,
+	.wb-activity-toggle {
+		opacity: 0.72;
+		pointer-events: auto;
+	}
+}
+
+.wb-ghost-btn .svg-icon {
+	width: 11px;
+	height: 11px;
+}
+
+/* ------------------------------------------------------------- citation */
+
+/*
+ * A quoted reference, not a button: a purple rule and a whisper of tint. The
+ * visible text is the prose itself, because that is what tells the writer which
+ * passage this was about.
+ */
+/*
+ * A quote is a rule; a message is a surface.
+ *
+ * These two sit directly above one another, and while both were accent-tinted
+ * they read as the same object at two strengths — a writer glancing at the
+ * thread could not tell "the passage I attached" from "the thing I said". The
+ * difference is now structural rather than a shade: the quote has no fill at
+ * all, just the accent rule down its left edge, which is what a quotation looks
+ * like everywhere else. The bubble stays the only filled thing in the pair.
+ */
+.wb-citation {
+	display: inline-flex;
+	align-items: stretch;
+	max-width: 100%;
+	min-width: 0;
+	border-left: 2px solid color-mix(in srgb, var(--wb-accent) 55%, transparent);
+	background: transparent;
+	overflow: hidden;
+}
+
+.wb-citation-body {
+	display: inline-flex;
+	align-items: center;
+	flex: 1 1 auto;
+	min-width: 0;
+	border: none;
+	background: transparent;
+	padding: 2px 8px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+}
+
+.wb-citation:hover {
+	background: color-mix(in srgb, var(--wb-accent) 12%, transparent);
+	border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+.wb-citation-body:hover {
+	color: var(--text-normal);
+}
+
+.wb-citation-text {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+.wb-citation-count {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	padding: 0 2px 0 6px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+}
+
+/* Inside the same surface, so it reads as part of the attachment. */
+.wb-citation-remove {
+	border: none;
+	background: transparent;
+	padding: 0 7px;
+	color: var(--text-faint);
+	font-size: 14px;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.wb-citation-remove:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+/* -------------------------------------------------------------- activity */
+
+/*
+ * The working state, while a turn runs.
+ *
+ * One line, two possible labels, and a clock. It used to narrate steps, and
+ * although each described something that really happened, a plausible-looking
+ * list of activities is indistinguishable from an invented one — so it asked to
+ * be trusted and gave no way to check. What is left is only what is
+ * unambiguously true from here: a request is out, or tokens are arriving.
+ */
+.wb-activity-live {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	line-height: 1.6;
+}
+
+/*
+ * The label carries the Runtime's `reasoning` text when there is one, which can
+ * be a whole sentence — so it truncates rather than wrapping the row and moving
+ * everything below it on every update.
+ */
+.wb-activity-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wb-activity-elapsed {
+	color: var(--text-faint);
+	opacity: 0.7;
+	font-variant-numeric: tabular-nums;
+	flex-shrink: 0;
+}
+
+.wb-activity-pulse {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--wb-accent);
+	animation: wb-pulse 1.2s ease-in-out infinite;
+	flex-shrink: 0;
+}
+
+.wb-activity-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 1px 5px 1px 2px;
+	border-radius: var(--radius-s);
+	color: var(--text-faint);
+	cursor: pointer;
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+}
+
+.wb-activity-toggle:hover {
+	border-color: color-mix(in srgb, var(--wb-accent) 18%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+	color: var(--wb-accent);
+}
+
+.wb-activity-toggle .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.wb-activity-body {
+	margin-top: 4px;
+	padding-left: 8px;
+	border-left: 1px solid var(--background-modifier-border);
+	font-size: var(--wb-font-meta);
+	color: var(--text-faint);
+}
+
+.wb-activity-facts {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	column-gap: 12px;
+	row-gap: 2px;
+}
+
+.wb-activity-fact { display: contents; }
+
+.wb-activity-fact-key {
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+.wb-activity-fact-value {
+	min-width: 0;
+	color: var(--text-muted);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.wb-activity-sources {
+	margin-top: 7px;
+}
+
+.wb-activity-sources-title {
+	margin-bottom: 5px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+}
+
+.wb-activity-sources-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 7px;
+}
+
+.wb-activity-sources-list .wb-source-inline {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wb-activity-list {
+	margin: 4px 0 0;
+	padding-left: 16px;
+	line-height: 1.65;
+}
+
+.is-streaming .wb-msg-text {
+	opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------- sources */
+
+/*
+ * A source reference, inline in the sentence it supports.
+ *
+ * These used to be collected into a row under the answer — a bibliography,
+ * which tells you some files were read and leaves you to work out which claim
+ * came from where. Now the reference is the assistant's own words, made
+ * clickable in place: underlined rather than boxed, so a paragraph containing
+ * two of them still reads as a paragraph.
+ */
+/*
+ * A citation is a link, so it looks like one — Obsidian's own link colour, not
+ * a bespoke purple. Someone reading an answer should recognise it as something
+ * to click without being told.
+ */
+.wb-source-inline {
+	display: inline;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--link-color, var(--text-accent));
+	font: inherit;
+	cursor: pointer;
+	text-decoration: var(--link-decoration, underline);
+	text-decoration-color: color-mix(in srgb, var(--link-color, var(--text-accent)) 45%, transparent);
+	text-underline-offset: 3px;
+}
+
+/* Quieter than the references it divides. */
+.wb-source-separator {
+	color: var(--text-faint);
+}
+
+.wb-source-inline:hover {
+	color: var(--link-color-hover, var(--text-accent-hover));
+	text-decoration-color: currentColor;
+}
+
+/* --------------------------------------------------------- branch markers */
+
+/*
+ * Where a conversation split, shown in place.
+ *
+ * Only direct children: a transcript that draws its own descendants stops being
+ * a transcript. The history modal is where the whole forest lives.
+ */
+.wb-branch-marker {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding: 2px 0;
+}
+
+.wb-branch-rule {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+}
+
+.wb-branch-rule-line {
+	flex: 1;
+	height: 1px;
+	background: var(--background-modifier-border);
+}
+
+.wb-branch-rule-text {
+	flex-shrink: 0;
+}
+
+.wb-branch-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	justify-content: center;
+}
+
+/* The parent marker is the same object, pointing the other way. */
+.wb-branch-marker.is-parent .wb-branch-rule-text {
+	opacity: 0.8;
+}
+
+.wb-branch-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+	min-width: 0;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 2px 8px;
+	border-radius: var(--radius-s);
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wb-branch-link:hover {
+	border-color: color-mix(in srgb, var(--wb-accent) 35%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+	color: var(--text-normal);
+}
+
+.wb-branch-link .svg-icon {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+
+/* --------------------------------------------------- rewrite review card */
+
+/*
+ * A contained candidate, not a tool panel.
+ *
+ * It reads as: conversation, then a clear editable thing, then conversation.
+ * The old full-width rule and bold `改写预览` heading announced a subsystem;
+ * a bordered card with its controls on top just shows you the change.
+ */
+.wb-candidate {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+	margin: 2px 0;
+	padding: 8px 9px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--wb-radius);
+	background: var(--background-primary);
+	min-width: 0;
+}
+
+.wb-candidate-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* Demoted to a caption. The diff below says what this is. */
+.wb-candidate-title {
+	font-weight: 400;
+	font-size: var(--wb-font-meta);
+	color: var(--text-faint);
+}
+
+.wb-candidate-sub,
+.wb-candidate-file {
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+}
+
+.wb-candidate-file {
+	margin-left: auto;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+
+/* A plain sentence. Nothing destructive has happened, so no warning panel. */
+.wb-candidate-note {
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	line-height: 1.6;
+}
+
+/* A salvaged parse is worth an actual warning: it can put junk in the page. */
+.wb-candidate-note.is-warning {
+	padding: 5px 8px;
+	border-radius: var(--radius-s);
+	border-left: 2px solid var(--text-warning, var(--wb-accent));
+	background: color-mix(in srgb, var(--text-warning, var(--wb-accent)) 8%, transparent);
+	color: var(--text-normal);
+}
+
+/*
+ * The passage, editable in place.
+ *
+ * It reads as the text it holds, not as a form field: no heavy border, the same
+ * size and line height as the diff beside it, and it grows with its content
+ * rather than scrolling inside a small box.
+ */
+.wb-diff-editor {
+	width: 100%;
+	min-height: 80px;
+	max-height: 60vh;
+	resize: none;
+	padding: 8px 9px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-family: inherit;
+	font-size: var(--wb-font-body);
+	line-height: var(--wb-line);
+	white-space: pre-wrap;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+.wb-diff-editor:focus {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: none;
+	outline: none;
+}
+
+.wb-diff-editor-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.wb-diff-editor-hint {
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+}
+
+/* ------------------------------------------------------------------ diff */
+
+/*
+ * Prose with marks on it, not a patch.
+ *
+ * No gutters, no line numbers, no monospace, no full-width red and green
+ * blocks: the tokenizer works at the character level so a two-character change
+ * in a Chinese paragraph shows as two marked characters, and the surrounding
+ * text has to stay completely neutral for that to be readable.
+ */
+.wb-diff-body {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	line-height: var(--wb-line);
+	/* The conversation owns scrolling, so the toolbar above can remain sticky. */
+	padding: 8px 9px;
+	border-radius: var(--radius-s);
+	background: var(--background-primary-alt);
+	font-size: var(--wb-font-body);
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/*
+ * Unchanged text gets no styling at all — no tint, no dimming. Only the edits
+ * are marked, which is what makes a two-character change in a Chinese
+ * paragraph readable.
+ */
+.wb-diff-equal {
+	color: var(--text-normal);
+}
+
+.wb-diff-delete {
+	background: rgba(220, 76, 70, 0.18);
+	color: var(--text-normal);
+	text-decoration: line-through;
+	text-decoration-color: rgba(220, 76, 70, 0.75);
+	border-radius: 2px;
+}
+
+.wb-diff-insert {
+	background: rgba(70, 167, 88, 0.2);
+	color: var(--text-normal);
+	border-radius: 2px;
+}
+
+/* View switch on the left, actions on the right — one row, not two blocks. */
+.wb-diff-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 2px 0 4px;
+	background: var(--background-primary);
+}
+
+.wb-diff-modes {
+	display: inline-flex;
+	gap: 1px;
+	padding: 2px;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+	flex-shrink: 0;
+}
+
+.wb-diff-mode {
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 2px 9px;
+	border-radius: calc(var(--radius-s) - 1px);
+	cursor: pointer;
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+}
+
+.wb-diff-mode.is-active {
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+
+/*
+ * 应用 / 撤销 / 复制修改后, always all three and always in this order.
+ *
+ * Applied turns 应用 into 已应用 in place and lights up 撤销 beside it; nothing
+ * is removed and nothing moves. A button that disappears on state change takes
+ * the next click to wherever the remaining button slid.
+ */
+.wb-diff-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-wrap: wrap;
+}
+
+.wb-diff-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 2px 8px;
+	border-radius: var(--radius-s);
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.wb-diff-action:hover:not(:disabled) {
+	border-color: var(--background-modifier-border-hover);
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.wb-diff-action:disabled {
+	opacity: 0.38;
+	cursor: default;
+}
+
+/* Applied is a state, not an absence — and it is not an error either. */
+.wb-diff-action.is-done {
+	color: var(--text-accent);
+	opacity: 0.7;
+}
+
+.wb-diff-action .svg-icon {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------- composer */
+
+.wb-composer {
+	padding: 6px var(--wb-gutter) 10px;
+	max-width: var(--wb-content-width);
+	margin: 0 auto;
+	width: 100%;
+}
+
+/*
+ * One surface holding the active-context actions, the input, the parameter row,
+ * and send. Previously these were separate blocks sitting next to each other,
+ * which read as loose controls rather than a place to write.
+ */
+.wb-shell {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--wb-radius);
+	background: var(--background-primary);
+	transition: border-color 120ms ease;
+	overflow: hidden;
+}
+
+.wb-shell:focus-within {
+	border-color: var(--background-modifier-border-focus);
+}
+
+.wb-context-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: nowrap;
+	gap: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	min-width: 0;
+	/* Reserved slot: the empty state keeps the filled state's height, so
+	   selecting text never shifts the transcript above. */
+	min-height: 34px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	overscroll-behavior-x: contain;
+}
+
+.wb-context-actions::-webkit-scrollbar { display: none; }
+
+.wb-actions {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	flex-wrap: nowrap;
+	gap: 4px;
+	margin-left: auto;
+	padding: 5px 7px 5px 0;
+	white-space: nowrap;
+}
+
+.wb-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 2px 8px;
+	border-radius: var(--radius-s);
+	cursor: pointer;
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+}
+
+.wb-action:hover:not(:disabled) {
+	border-color: var(--background-modifier-border);
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.wb-action.is-active {
+	border-color: var(--interactive-accent);
+	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+	color: var(--text-normal);
+}
+
+.wb-action.is-active:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.wb-action:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.wb-action .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.wb-context {
+	display: flex;
+	align-items: center;
+	padding: 5px 8px;
+	min-width: 8rem;
+	flex: 1 0 8rem;
+}
+
+/*
+ * The attached passage is sized by what it quotes, not by the row it sits in.
+ *
+ * `flex: 1` made the chip a column of the composer row: a six-character quote
+ * was stretched the full width and the remove control was pushed to the far
+ * edge, leaving a band of empty tint that read as a loading state. Growing is
+ * what had to go, not shrinking — the chip still gives way when the composer
+ * is narrow, and `max-width` still stops a long quote from running the row.
+ *
+ * `.wb-citation-body` needed `width: 0` only because a stretched parent had
+ * space to hand back; sized by content, the body may state its own width and
+ * still collapse under `min-width: 0` when the quote is too long to fit.
+ */
+.wb-context .wb-citation {
+	min-width: 0;
+	max-width: min(22rem, 45vw);
+	flex: 0 1 auto;
+}
+
+.wb-input {
+	width: 100%;
+	border: none;
+	background: transparent;
+	user-select: text;
+	-webkit-user-select: text;
+	padding: 10px 10px 4px;
+	resize: none;
+	min-height: 68px;
+	max-height: 180px;
+	font-family: inherit;
+	font-size: var(--wb-font-body);
+	line-height: 1.6;
+}
+
+.wb-input:focus {
+	box-shadow: none;
+	border: none;
+}
+
+.wb-composer-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 6px 6px;
+	min-width: 0;
+}
+
+.wb-selectors {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	flex: 1;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	overscroll-behavior-x: contain;
+}
+
+.wb-selectors::-webkit-scrollbar { display: none; }
+
+/* `Label: value` text pairs, not three boxes. */
+.wb-param {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	min-width: 0;
+	font-size: var(--wb-font-meta);
+	flex: 0 0 auto;
+}
+
+.wb-param-label {
+	color: var(--text-faint);
+	white-space: nowrap;
+}
+
+/*
+ * The clickable half of a `Label: value` pair.
+ *
+ * Slightly emphasised against the muted label so the eye can find what is
+ * actually set, and marked when it is not set at all — an unchosen parameter
+ * is the reason send is blocked, so it should look like the thing to press.
+ */
+.wb-param-value {
+	border: 1px solid transparent;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--wb-font-meta);
+	padding: 1px 6px;
+	border-radius: var(--radius-s);
+	height: auto;
+	min-width: 0;
+	max-width: 11rem;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wb-param-value.is-disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.wb-param-value:hover {
+	border-color: var(--background-modifier-border-hover);
+	background: var(--background-modifier-hover);
+}
+
+/* While its list is open, the control reads as the thing that is open. */
+.wb-param.is-open .wb-param-value {
+	border-color: var(--background-modifier-border-hover);
+	background: var(--background-modifier-hover);
+}
+
+.wb-param-value.is-unset {
+	color: var(--wb-accent);
+	border-color: color-mix(in srgb, var(--wb-accent) 30%, transparent);
+}
+
+/* Says why send is blocked, next to the controls that are blocking it. */
+.wb-composer-hint {
+	padding: 5px 4px 0;
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	line-height: 1.5;
+}
+
+.wb-send-slot {
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+/*
+ * One geometry in every state.
+ *
+ * Obsidian's base button has its own padding and a pill radius, which showed
+ * through on hover and on press — so the control turned from a square into a
+ * capsule under the cursor, and again when Send became Stop. Fixed box, fixed
+ * radius, padding zeroed, and the same rules for both states.
+ */
+.wb-root .wb-send-btn,
+.wb-root .wb-send-btn:hover,
+.wb-root .wb-send-btn:active,
+.wb-root .wb-send-btn:focus,
+.wb-root .wb-send-btn.is-stop,
+.wb-root .wb-send-btn.is-stop:hover,
+.wb-root .wb-send-btn.is-stop:active {
+	width: 26px;
+	min-width: 26px;
+	height: 26px;
+	min-height: 26px;
+	padding: 0;
+	flex: 0 0 26px;
+	border: none;
+	border-radius: 7px;
+	box-shadow: none;
+	/* The row's height must not depend on which state this is in. */
+	line-height: 1;
+	align-self: center;
+}
+
+.wb-root .wb-send-btn {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.wb-root .wb-send-btn:hover {
+	background: var(--interactive-accent-hover);
+	color: var(--text-on-accent);
+}
+
+.wb-root .wb-send-btn.is-stop {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.wb-root .wb-send-btn.is-stop:hover {
+	background: var(--background-modifier-border-hover);
+	color: var(--text-normal);
+}
+
+/* --------------------------------------------------------------- history */
+
+/*
+ * Slightly larger than a default modal, and no larger.
+ *
+ * Titles carrying chapter context need the width, and the branch indentation
+ * needs somewhere to go; full-screen would turn picking a conversation into
+ * leaving the one you are in.
+ */
+/* The history modal renders outside `.wb-root`, so it owns the tokens it uses. */
+.wb-history-modal {
+	--wb-font-ui: 13.5px;
+	--wb-font-meta: 12px;
+	--wb-accent: var(--interactive-accent);
+}
+
+.wb-history-modal {
+	/* Wider than before: titles now carry chapter context and were truncating
+	 * before the part that identified them. */
+	width: min(780px, 88vw);
+	max-width: 88vw;
+}
+
+.wb-history-modal .modal-content {
+	padding-top: 4px;
+	max-height: min(70vh, 720px);
+}
+
+.wb-history-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+	/* Clear of Obsidian's own close button in the corner. */
+	padding-right: 28px;
+}
+
+.wb-history-title {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 500;
+	flex: 1;
+	min-width: 0;
+}
+
+.wb-history-controls {
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	flex-shrink: 0;
+}
+
+/*
+ * One surface, one border.
+ *
+ * The input inside carries Obsidian's own border and background by default, so
+ * the field appeared as a box inside a box with two visible outlines. The
+ * wrapper owns the surface; the input is stripped to nothing.
+ */
+.wb-history-search {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 9px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+	transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.wb-history-search:focus-within {
+	border-color: var(--background-modifier-border-focus);
+}
+
+.wb-history-search-icon {
+	display: inline-flex;
+	color: var(--text-faint);
+	flex-shrink: 0;
+}
+
+.wb-history-search-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+/*
+ * The input is stripped to nothing so the wrapper owns the one visible border.
+ * Obsidian styles `input` with its own border, background and focus ring, and
+ * all three showed through — the field looked like a box inside a box.
+ */
+.wb-history-modal .wb-history-search-input,
+.wb-history-modal .wb-history-search-input:focus,
+.wb-history-modal .wb-history-search-input:focus-visible,
+.wb-history-modal .wb-history-search-input:active,
+.wb-history-modal .wb-history-search-input:hover,
+.wb-history-modal input[type="search"].wb-history-search-input {
+	flex: 1;
+	min-width: 0;
+	border: none;
+	outline: none;
+	outline-offset: 0;
+	background: transparent;
+	background-color: transparent;
+	box-shadow: none;
+	padding: 5px 0;
+	height: auto;
+	line-height: 1.5;
+	font-size: var(--wb-font-ui);
+}
+
+/* The browser's own clear affordance is a third border in the field. */
+.wb-history-search-input::-webkit-search-cancel-button {
+	display: none;
+}
+
+.wb-history-count {
+	padding: 8px 2px 2px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+}
+
+.wb-history-list {
+	max-height: min(64vh, 620px);
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+/* Left-aligned section headings, sticky while scrolling. */
+.wb-history-group {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 12px 4px 4px;
+	color: var(--text-faint);
+	font-size: var(--wb-font-meta);
+	background: var(--background-primary);
+	text-align: left;
+}
+
+.wb-history-empty {
+	padding: 22px 8px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+}
+
+/*
+ * A tree drawn on a grid.
+ *
+ * Every row is: indent spacer, chevron column, title. The chevron column is a
+ * fixed width whether or not a row has a chevron, and the indent is a whole
+ * number of steps, so titles at the same depth start at exactly the same
+ * x-position and nothing shifts sideways as branches are expanded.
+ */
+.wb-history-row {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	min-height: 32px;
+	border-radius: var(--radius-s);
+	min-width: 0;
+}
+
+.wb-history-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.wb-history-indent {
+	flex-shrink: 0;
+}
+
+/* Current conversation: a quiet tint and firmer title. No leading bar — that
+ * edge belongs visually to the branch chevron/indent system. */
+.wb-history-row.is-active {
+	background: color-mix(in srgb, var(--wb-accent) 7%, transparent);
+}
+
+.wb-history-row.is-active .wb-history-name {
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+/*
+ * Archived rows, when they are shown at all.
+ *
+ * Present but plainly set aside: dimmed, with the title no longer at full
+ * strength. They keep their place in the branch tree rather than being torn out
+ * into a separate bin, because a conversation's parent is part of what it is.
+ */
+.wb-history-row.is-archived .wb-history-open {
+	opacity: 0.52;
+}
+
+.wb-history-row.is-archived .wb-history-name {
+	font-style: italic;
+}
+
+/* Hover-revealed, at the trailing edge, and always reachable by keyboard. */
+.wb-history-actions {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	flex-shrink: 0;
+	padding-right: 4px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.wb-history-row:hover .wb-history-actions,
+.wb-history-actions:focus-within {
+	opacity: 1;
+}
+
+.wb-history-action {
+	width: 22px;
+	height: 22px;
+}
+
+.wb-history-action .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+/* The only destructive control in the plugin says so on hover, not at rest. */
+.wb-history-action.is-destructive:hover {
+	color: var(--text-error);
+	border-color: color-mix(in srgb, var(--text-error) 40%, transparent);
+	background: color-mix(in srgb, var(--text-error) 8%, transparent);
+}
+
+/* The archive toggle stays lit while archived rows are on screen. */
+.wb-history-controls .is-on {
+	color: var(--wb-accent);
+	border-color: color-mix(in srgb, var(--wb-accent) 40%, transparent);
+	background: color-mix(in srgb, var(--wb-accent) 10%, transparent);
+}
+
+/* Light enough to read through, firm enough to find. */
+.wb-history-match {
+	background: color-mix(in srgb, var(--wb-accent) 22%, transparent);
+	border-radius: 2px;
+}
+
+.wb-history-twisty {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 22px;
+	padding: 0;
+	color: var(--text-faint);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.wb-history-twisty:hover {
+	color: var(--text-normal);
+}
+
+.wb-history-twisty .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+/* Keeps titles aligned whether or not a row has a twisty. */
+.wb-history-twisty-spacer {
+	width: 18px;
+	flex-shrink: 0;
+}
+
+.wb-history-open {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1;
+	min-width: 0;
+	padding: 5px 8px 5px 3px;
+	cursor: pointer;
+	color: inherit;
+}
+
+.wb-history-line {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	min-width: 0;
+	width: 100%;
+}
+
+.wb-history-name {
+	font-size: var(--wb-font-ui);
+	line-height: 1.45;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+	flex: 1;
+}
+
+/* Secondary, and never allowed to crowd the title. */
+.wb-history-meta {
+	color: var(--text-faint);
+	opacity: 0.8;
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+	flex-shrink: 0;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Only present for a search hit, where it is the reason the row is shown. */
+.wb-history-excerpt {
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+.wb-history-modal .wb-history-more {
+	display: block;
+	width: 100%;
+	margin: 10px 0 2px;
+	padding: 6px;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	cursor: pointer;
+	text-align: center;
+}
+
+.wb-history-more:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* ---------------------------------------------------------------- modals */
+
+.wb-modal .wb-modal-hint {
+	color: var(--text-muted);
+	font-size: var(--wb-font-meta);
+	line-height: 1.6;
+	margin-top: 0;
+}
+
+/* Only ConfirmModal remains: a blocking question, not a workflow. */
+.wb-modal-input {
+	width: 100%;
+	resize: vertical;
+	font-family: inherit;
+}
+
+/* -------------------------------------------------------------- settings */
+
+.wb-settings { container-type: inline-size; }
+
+.wb-settings-content {
+	width: 100%;
+	margin: 0;
+}
+
+.wb-settings-section {
+	width: 100%;
+	margin: 0 0 28px;
+}
+
+/*
+ * The plugin's name, not a fifth section heading.
+ *
+ * It is deliberately built outside `Setting.setHeading()`: rendered as a
+ * heading it took the same size and weight as 项目数据 below it, so the page
+ * opened with five peers and no title.
+ */
+.wb-settings-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 var(--size-4-5, 20px);
+	padding-inline: var(--size-4-4, 16px);
+	color: var(--text-normal);
+	font-size: var(--font-ui-larger);
+	font-weight: var(--font-bold);
+	line-height: 1.3;
+}
+
+.wb-settings-title-icon {
+	display: flex;
+	color: var(--text-accent);
+}
+
+.wb-settings-title-icon .svg-icon {
+	width: 1.15em;
+	height: 1.15em;
+}
+
+.wb-settings-section .wb-settings-status {
+	box-sizing: border-box;
+	padding-inline: var(--size-4-4, 16px);
+}
+
+.wb-settings-section .wb-settings-note {
+	box-sizing: border-box;
+	margin: 0;
+	padding-inline: var(--size-4-4, 16px);
+}
+
+/* Obsidian's own settings put links on their own line under the description. */
+.wb-settings-link { display: block; width: fit-content; }
+
+.wb-settings-section .wb-settings-status:empty { display: none; }
+
+.wb-settings-section-error {
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	color: var(--text-error);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+/*
+ * A connection row is an ordinary Obsidian setting row.
+ *
+ * It used to draw its own border, radius and background inside a gapped flex
+ * list, which turned a run of rows into a stack of detached cards while every
+ * native page reads as one panel divided by hairlines. The grid it declared
+ * also replaced the native flex row, and at panel width its third column
+ * collapsed and threw the toggle and buttons onto a line of their own, left
+ * aligned, where nothing else in Obsidian puts them.
+ *
+ * All of that is gone. What remains is only what Obsidian has no opinion
+ * about: the row is clickable, and it carries a health dot ahead of the name.
+ */
+.wb-connection-card { cursor: pointer; }
+.wb-connection-card:hover { background: var(--background-modifier-hover); }
+/* The base dot is nudged down to sit against a wrapped label; on one centred
+   line beside the name it needs no offset. */
+.wb-connection-card-name > .wb-connection-health-dot { margin-top: 0; }
+
+.wb-skill-group {
+	margin-top: 14px;
+}
+
+.wb-skill-group > .setting-item-heading {
+	padding-bottom: 6px;
+}
+
+.wb-skill-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.wb-skill-row {
+	min-width: 0;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary-alt);
+}
+
+.wb-skill-row.is-attention {
+	border-color: var(--text-warning, var(--background-modifier-border));
+}
+
+.wb-skill-row .setting-item-info,
+.wb-skill-row .setting-item-control {
+	min-width: 0;
+}
+
+.wb-skill-row .setting-item-control {
+	flex-wrap: wrap;
+}
+
+.wb-skill-empty {
+	margin: 0;
+	padding: 6px 12px 10px;
+}
+
+.wb-skill-problems {
+	margin: 12px var(--size-4-4, 16px) 0;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.wb-skill-problems-title {
+	margin-bottom: 3px;
+	color: var(--text-warning, var(--text-normal));
+	font-weight: 600;
+}
+
+.wb-project-instructions {
+	margin-bottom: var(--size-4-4, 16px);
+}
+
+.wb-project-instructions-row {
+	min-width: 0;
+}
+
+.wb-project-instructions-row .setting-item-info,
+.wb-project-instructions-row .setting-item-control {
+	min-width: 0;
+}
+
+.wb-project-instructions-row .setting-item-description {
+	overflow-wrap: anywhere;
+}
+
+.wb-project-instructions-row .setting-item-control {
+	flex-wrap: wrap;
+}
+
+.wb-project-instructions-row.is-invalid .setting-item-description {
+	color: var(--text-warning, var(--text-muted));
+}
+
+
+.wb-connection-card-copy { min-width: 0; }
+/* Name then health dot. Only the label truncates; the dot is the state and
+   must survive a long name. */
+.wb-connection-card-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.wb-connection-card-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-connection-card-type,
+.wb-connection-card-expiry,
+.wb-connection-card-error { line-height: 1.45; }
+.wb-connection-card-error { color: var(--text-error); }
+.wb-connection-card > .setting-item-control { min-width: 0; flex-wrap: nowrap; }
+.wb-connection-modal-shell {
+	container-type: inline-size;
+	width: min(680px, calc(100vw - 32px));
+	max-width: calc(100vw - 32px);
+}
+
+.wb-skill-modal-shell {
+	container-type: inline-size;
+	width: min(680px, calc(100vw - 32px));
+	max-width: calc(100vw - 32px);
+}
+
+.wb-project-instructions-modal-shell {
+	container-type: inline-size;
+	width: min(680px, calc(100vw - 32px));
+	max-width: calc(100vw - 32px);
+}
+
+.wb-project-instructions-modal {
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.wb-project-instructions-intro {
+	margin: 0 0 12px;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.wb-project-instructions-modal .setting-item {
+	min-width: 0;
+	gap: 16px;
+}
+
+.wb-project-instructions-modal .setting-item-info,
+.wb-project-instructions-modal .setting-item-control {
+	min-width: 0;
+}
+
+.wb-project-instructions-modal .setting-item-control {
+	flex: 0 1 58%;
+	max-width: 58%;
+	flex-wrap: wrap;
+}
+
+.wb-project-instructions-field {
+	align-items: stretch;
+	flex-direction: column;
+}
+
+.wb-project-instructions-field .setting-item-control {
+	width: 100%;
+	max-width: 100%;
+}
+
+.wb-project-instructions-modal textarea {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	resize: vertical;
+	font-family: var(--font-text);
+	line-height: 1.55;
+}
+
+.wb-project-instructions-preview {
+	max-height: 44vh;
+	margin: 2px 0 14px;
+	padding: 12px 14px;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary-alt);
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.wb-project-instructions-warning {
+	margin: 4px 0 14px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	color: var(--text-warning, var(--text-muted));
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.wb-project-instructions-modal-actions .setting-item-control {
+	max-width: 100%;
+	flex-basis: 100%;
+	justify-content: flex-end;
+}
+
+.wb-project-instructions-modal-status:empty { display: none; }
+.wb-project-instructions-modal-status { min-height: 18px; }
+
+.wb-skill-modal {
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.wb-skill-modal-intro {
+	margin: 0 0 12px;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.wb-skill-modal .setting-item {
+	min-width: 0;
+	gap: 16px;
+}
+
+.wb-skill-modal .setting-item-info,
+.wb-skill-modal .setting-item-control {
+	min-width: 0;
+}
+
+.wb-skill-modal .setting-item-control {
+	flex: 0 1 58%;
+	max-width: 58%;
+	flex-wrap: wrap;
+}
+
+.wb-skill-modal input[type="text"],
+.wb-skill-modal select,
+.wb-skill-modal textarea {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.wb-skill-modal textarea {
+	resize: vertical;
+	font-family: var(--font-text);
+	line-height: 1.55;
+}
+
+.wb-skill-instruction-field {
+	align-items: stretch;
+	flex-direction: column;
+}
+
+.wb-skill-instruction-field .setting-item-control {
+	width: 100%;
+	max-width: 100%;
+}
+
+.wb-skill-instruction-preview {
+	max-height: 44vh;
+	margin: 2px 0 14px;
+	padding: 12px 14px;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary-alt);
+	color: var(--text-normal);
+	font-family: var(--font-text);
+	font-size: 13px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+}
+
+.wb-skill-modal-actions .setting-item-control {
+	max-width: 100%;
+	flex-basis: 100%;
+	justify-content: flex-end;
+}
+
+.wb-skill-modal-status:empty { display: none; }
+.wb-skill-modal-status { min-height: 18px; }
+
+.wb-connection-modal {
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.wb-connection-modal .setting-item {
+	min-width: 0;
+	gap: 16px;
+}
+
+.wb-connection-modal .setting-item-info,
+.wb-connection-modal .setting-item-control { min-width: 0; }
+
+.wb-connection-modal .setting-item-control {
+	flex: 0 1 58%;
+	max-width: 58%;
+	flex-wrap: wrap;
+}
+
+.wb-connection-modal input[type="text"],
+.wb-connection-modal input[type="password"] {
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+	flex: 1 1 220px;
+}
+
+.wb-connection-modal select { max-width: 100%; min-width: 0; }
+
+.wb-connection-modal-actions .setting-item-control {
+	max-width: 100%;
+	flex-basis: 100%;
+	justify-content: flex-end;
+}
+
+.wb-connection-modal-status:empty { display: none; }
+.wb-connection-modal-status { min-height: 18px; }
+.wb-connection-card-warning { display: flex; align-items: center; gap: 7px; color: var(--text-warning, var(--text-muted)); font-size: 12px; }
+.wb-connection-card-warning button { padding: 0 3px; color: inherit; text-decoration: underline; }
+
+@container (max-width: 620px) {
+	.wb-settings-section { margin-bottom: 24px; }
+
+	/* The connection row deliberately keeps its native single-line layout here.
+	   Obsidian narrows its own rows without breaking them onto two lines, and
+	   the override that used to do so is what made the settings page look
+	   unlike every other page in the app. */
+	.wb-connection-modal .setting-item { align-items: stretch; flex-direction: column; }
+	.wb-connection-modal .setting-item-control { max-width: 100%; width: 100%; }
+	.wb-skill-row { align-items: stretch; flex-direction: column; }
+	.wb-skill-row .setting-item-control { justify-content: flex-start; }
+	.wb-skill-modal .setting-item { align-items: stretch; flex-direction: column; }
+	.wb-skill-modal .setting-item-control { max-width: 100%; width: 100%; }
+	.wb-project-instructions-row { align-items: stretch; flex-direction: column; }
+	.wb-project-instructions-row .setting-item-control { justify-content: flex-start; }
+	.wb-project-instructions-modal .setting-item { align-items: stretch; flex-direction: column; }
+	.wb-project-instructions-modal .setting-item-control { max-width: 100%; width: 100%; }
+}
+
+.wb-msg-error-action {
+	margin-left: 8px;
+	color: var(--text-error);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* Diagnostics stay out of Settings until explicitly opened. */
+.wb-diagnostics-modal {
+	width: min(720px, 88vw);
+	max-width: 88vw;
+}
+
+.wb-diagnostics-intro {
+	margin-top: 0;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.wb-diagnostics-report {
+	max-height: 42vh;
+	margin: 6px 0 16px;
+	padding: 12px 14px;
+	overflow: auto;
+	border-radius: var(--radius-s);
+	background: var(--background-primary-alt);
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: 11.5px;
+	line-height: 1.6;
+	white-space: pre;
+}
+
+/*
+ * A compact result, not a banner.
+ *
+ * The verdict is one small line in a muted success colour; what was actually
+ * loaded sits under it, smaller and quieter still.
+ */
+.wb-settings-status.is-ok .wb-settings-verdict {
+	color: var(--text-success, var(--text-accent));
+	opacity: 0.85;
+	font-size: var(--wb-font-meta, 11.5px);
+}
+
+.wb-settings-status.is-failed .wb-settings-verdict {
+	color: var(--text-error);
+	font-size: var(--wb-font-meta, 11.5px);
+}
+
+.wb-settings-detail {
+	margin-top: 1px;
+	color: var(--text-faint);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.wb-settings-status.is-ok {
+	color: var(--text-success, var(--text-normal));
+}
+
+.wb-settings-status.is-failed {
+	color: var(--text-error);
+}
+
+.wb-settings-status.is-checking {
+	opacity: 0.7;
+}
+
+.wb-settings-status {
+	/* Settings status text is a direct child, while Setting content has its own
+	 * inset. Match that inset so a result line reads as part of the section
+	 * instead of hanging in the page gutter. */
+	margin: 6px 0 0;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.wb-settings-note {
+	color: var(--text-faint);
+	/* Settings lives outside .wb-root, so the sidebar's --wb-font-meta token is
+	 * not available here. Use an explicit compact size for explanatory copy. */
+	font-size: 12px;
+	line-height: 1.55;
+	margin-top: 8px;
+	margin-bottom: 8px;
+}
+
+/* ------------------------------------------------------- narrow sidebar */
+
+/*
+ * Keep the attached passage visible when focus moves into the composer.
+ * Native editor selection often stops painting on blur; this mark represents
+ * the conversation attachment without changing the editor's real selection.
+ */
+.cm-editor .wb-attached-selection {
+	background-color: var(--text-selection, color-mix(in srgb, var(--interactive-accent) 22%, transparent));
+	box-shadow: inset 0 -1px color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+}
+
+/* CodeMirror paints its native range after blur. Once a conversation switch
+ * changes (or removes) the attachment, only our current-session mark should be
+ * visible; the underlying native range is preserved for editor behaviour. */
+.cm-editor.wb-hide-native-selection .cm-selectionBackground {
+	background-color: transparent;
+}
+
+.workspace-leaf-content[data-type="writing-buddy-view"] {
+	container-type: inline-size;
+}
+
+/* Keep the single-line selector strip compact at the narrowest sidebar width. */
+@container (max-width: 330px) {
+	.wb-selectors { gap: 6px; }
+
+	.wb-param-value {
+		max-width: 6.5em;
+	}
+
+	.wb-msg-user .wb-msg-text,
+	.wb-msg-user .wb-msg-attachment {
+		max-width: 100%;
+	}
+
+	.wb-thread {
+		gap: 12px;
+	}
+}
+
+/* At very narrow widths the history row may stack rather than truncate away. */
+@media (max-width: 400px) {
+	.wb-history-line {
+		flex-wrap: wrap;
+		gap: 0 8px;
+	}
+
+	.wb-history-meta {
+		flex-basis: 100%;
+		text-align: left;
+	}
+}
+
+/*
+ * The routing probe's answer.
+ *
+ * Reads as a result rather than as another instruction block: muted, no panel
+ * of its own, sitting directly under the row that produced it. It updates on
+ * every keystroke, so it must not move the layout while someone is typing —
+ * hence a reserved minimum height instead of a box that appears and vanishes.
+ */
+.wb-skill-routing-verdict {
+	min-height: 2.6em;
+	margin: 2px 0 6px;
+	color: var(--text-muted);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.wb-skill-routing-field {
+	padding-top: 0;
+	border-top: none;
+}
+
+.wb-skill-routing-field input[type="text"] {
+	width: 100%;
+}

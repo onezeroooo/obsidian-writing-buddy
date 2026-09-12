@@ -1,0 +1,10 @@
+{
+	"id": "writing-buddy",
+	"name": "Writing Buddy",
+	"version": "0.8.23",
+	"minAppVersion": "1.4.5",
+	"description": "Chat about selected text, generate rewrites, and review changes before they reach your manuscript.",
+	"author": "onezeroooo",
+	"authorUrl": "https://github.com/onezeroooo",
+	"isDesktopOnly": false
+}
