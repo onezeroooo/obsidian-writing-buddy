@@ -2433,6 +2433,43 @@
 }
 
 .wb-connection-modal-status:empty { display: none; }
+
+.wb-provider-search {
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+.wb-provider-list {
+	display: flex;
+	flex-direction: column;
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.wb-provider-group {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	padding: 10px 6px 4px;
+}
+
+.wb-provider-row {
+	text-align: left;
+	justify-content: flex-start;
+	box-shadow: none;
+	background: transparent;
+	padding: 6px 8px;
+	border-radius: var(--radius-s);
+}
+
+.wb-provider-row:hover,
+.wb-provider-row:focus-visible { background: var(--background-modifier-hover); }
+
+.wb-provider-empty {
+	color: var(--text-muted);
+	padding: 12px 6px;
+}
 .wb-connection-modal-status { min-height: 18px; }
 .wb-connection-card-warning { display: flex; align-items: center; gap: 7px; color: var(--text-warning, var(--text-muted)); font-size: 12px; }
 .wb-connection-card-warning button { padding: 0 3px; color: inherit; text-decoration: underline; }

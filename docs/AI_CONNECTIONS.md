@@ -1,144 +1,108 @@
 # AI Connections
 
-Writing Buddy exposes one AI interface and routes each conversation through an
-explicit user-configured Connection. The unified AI layer has three adapter
-families: Local, Direct API, and Self-hosted Runtime.
+Writing Buddy has no account and no bundled model. You add one or more
+connections under **Settings → Writing Buddy → AI Connections**, and each
+conversation picks the one it uses. A connection is a provider plus whatever
+that provider needs from you — usually an API key, sometimes an address.
 
-## Terminology
+## Adding a connection
 
-- Connection: a user-configured AI access target.
-- Backend: an internal implementation adapter.
-- Provider: the model provider exposed through a Connection.
-- Model: the model selected under that Provider.
+**Add AI Connection** opens a searchable list of providers:
 
-Connection is not Provider or Model. Backend is not the user-visible
-Connection. Self-hosted Runtime and Direct API are connection types, not providers.
-The same provider and model may be used through several Connections with
-different endpoints, credentials, or execution locations.
+| Group | Providers |
+|---|---|
+| **Popular** | OpenAI, Anthropic, Google, DeepSeek, OpenRouter |
+| **More providers** | Mistral, Groq, Cerebras, Together AI, Fireworks AI, Perplexity, Hugging Face, SiliconFlow |
+| **Advanced** | Ollama, Custom OpenAI-compatible |
 
-## Supported connection types
+Pick a provider and the form asks only for what it needs:
 
-- Self-hosted Runtime uses RemoteAIBackend and discovers capabilities from the V2
-  capabilities endpoint.
-- Direct API uses DirectAPIBackend. It supports OpenAI, Anthropic, Google and
-  OpenAI-compatible endpoints, using provider discovery or a configured model
-  allow-list.
-- Local supports Ollama and an unauthenticated OpenAI-compatible llama.cpp
-  server. Ollama discovers `/api/tags`; llama.cpp checks `/health`, discovers
-  `/v1/models`, and generates through `/v1/chat/completions`. The llama.cpp
-  endpoint is restricted to loopback and defaults to
-  `http://127.0.0.1:8793/v1`. Writing Buddy never starts or stops either server.
+- **Name** — prefilled with the provider's name; change it if you keep several
+  connections to the same provider.
+- **API Key** — for every hosted provider. Stored on this device only.
+- **Base URL** — only for Ollama and Custom OpenAI-compatible, where the
+  endpoint is yours to choose. Hosted providers use their own address; you do not
+  enter one.
+- **Model** — after **Test**, the models that provider offers are listed. Pin one,
+  or leave all of them available and choose per conversation.
 
-## Routing
+Several connections can coexist. The connection list shows each one by
+provider — "DeepSeek · deepseek-chat", "Ollama" — together with its health.
 
-The Composer exposes an explicit sequence: Connection, Provider, Model, Effort,
-and Context. All five choices are per-vault and per-device. A complete local
-override for the current session wins as a whole; otherwise the current device's
-new-conversation default applies. The default is not copied into synced
-conversation JSON, and schema <= 3 conversation preferences are never consulted.
+## Providers
 
-No request is silently rerouted. RoutingAIBackend resolves `connectionId`
-through BackendRegistry and rejects missing, removed, or disabled Connections.
-Removing or disabling a Connection preserves the session's stable local override
-and display snapshot, so the Composer shows the removed or disabled selection
-and requires the writer to choose again instead of falling back to the default.
+**OpenAI, Anthropic and Google** are reached through their own APIs with your own
+key.
 
-The user-visible Context choices appear in this product order:
+**DeepSeek, OpenRouter, Mistral, Groq, Cerebras, Together AI, Fireworks AI,
+Perplexity, Hugging Face and SiliconFlow** are reached through their
+OpenAI-compatible APIs at their official addresses. Models are read from the
+provider's model listing; Perplexity, whose API has no listing, offers its
+documented models directly. A model list always comes from the provider you
+chose — never from another provider's catalogue.
 
-- `Auto` starts with the Agent decision loop. The Agent may choose `synthesize`
-  without a Vault search, use the controlled research tools, or request the
-  existing complete-corpus workflow when correctness requires every target
-  unit to be covered. The client validates and executes that choice.
-- `Full` requests complete coverage of the current manuscript through the
-  complete-corpus workflow. It is a separate coverage intent, not a higher
-  Context tier or a deeper form of Auto.
-- `Low` is local-only: it uses the supplied selection, surroundings, and active
-  editor context without entering cross-file Agent research.
+**Ollama** is supported as a convenience for models running on a machine you
+control. The default address is `http://127.0.0.1:11434`; change it if Ollama
+runs elsewhere on your network. No key is needed. Writing Buddy never starts,
+stops or manages Ollama.
 
-`High` and `Medium` are no longer user-visible Context choices. Historical
-reports and legacy plumbing may retain those values for compatibility, but the
-Composer does not offer them. Context and model reasoning effort remain
-independent; this work does not change Effort, Connection, Provider, or Model
-behavior.
+**Custom OpenAI-compatible** covers everything else that speaks the OpenAI chat
+API: a gateway you operate, a local server such as llama.cpp or vLLM, a hosted
+service not in the list. Enter its base URL (usually ending in `/v1`) and a key
+if the endpoint requires one. The endpoint can be local, on your LAN, remote or
+self-hosted; Writing Buddy does not require a specific backend.
 
-Turn preflight, context assembly, bounded research, corpus-wide synthesis,
-citations, and rewrite review use the same provider-neutral request shape. Each
-backend translates it to its transport. Multi-call jobs freeze their Connection,
-Provider, Model, Effort, history window, and composed instructions at the start;
-there is no mid-run rerouting. AI responses remain candidates; only the local
-Obsidian editing layer may apply a rewrite after exact-range validation.
+### On mobile
 
-The Agent owns semantic planning: it chooses the next semantic search, which
-opaque result to read, whether more surrounding text is needed, and when the
-available evidence is sufficient to synthesize. Writing Buddy owns eligibility,
-handle resolution, every Vault read, source-revision checks, evidence admission,
-provenance, budgets, cancellation, and safety. The backend receives only
-client-supplied text, opaque run-local handles, and evidence IDs—never a Vault
-path selector, filesystem capability, or server-side project directory. The
-Vault is the source of truth. Retrieval is an internal replaceable component,
-not part of a provider or Runtime contract.
+Use a provider or endpoint the device can reach. A model server listening only
+on another machine's loopback address is not reachable from a phone or tablet.
 
-The Agent action trace is kept only as ephemeral, in-memory diagnostics for the
-current run. It is not persisted in conversation metadata or written to the
-Vault. Full continues to use the retained client-side complete-corpus
-orchestration over ordinary chat calls; it adds no remote filesystem capability.
+## Choosing per conversation
 
-## Persistence and secrets
+The Composer offers, in order: Connection, Provider, Model, Effort and Context.
+All five choices are per vault and per device. A conversation that has made its
+own choice keeps it; otherwise the device's new-conversation default applies.
+That default is never copied into synced conversation files.
 
-Connection configs and credentials are device-local. Composer Connection,
-Provider, Model, Effort and Context choices are stored separately per vault and
-device, keyed by session id. That local override includes a stable Connection id
-and display snapshot so a removed or disabled selection remains visible. Session
-deletion clears its override, a conversation-file rename moves it to the new id,
-and startup prunes stale overrides, including entries left by bulk deletion, for
-session ids that no longer exist.
+No request is rerouted silently. If a conversation's connection is removed or
+disabled, the Composer shows the missing selection and asks you to choose again
+rather than falling back to another connection.
 
-When older local preferences are loaded, legacy Context `High` and `Medium`
-normalize to `Auto`; `Full` remains `Full`. Historical execution reports keep
-their recorded detail, including a legacy mode value when present.
+Context is a Writing Buddy setting, separate from the model's own effort level:
 
-Conversation schema v4 omits top-level `preferences` entirely. Schema <= 3
-preferences remain parseable so old files load, but they are ignored, stripped
-on the next save, and never imported into device state. Assistant-message
-`GenerationMetadata` remains synced as a safe historical execution snapshot of
-the Connection display identity and provider/model/effort actually used. It
-contains no credential or full endpoint URL; its display detail may retain a
-safe route host, provider, or local-engine label.
+- **Auto** — the agent decides: synthesize from local context, research the
+  manuscript through bounded reads, or ask for complete coverage when
+  correctness needs it.
+- **Full** — complete coverage of the current manuscript.
+- **Low** — the selection, its surroundings and the active note only; never
+  other files.
 
-The old singleton Runtime URL and token migrate once to the stable ID
-conn_legacy_remote_runtime. A legacy device default may point to that migrated
-Connection, but legacy conversation preferences do not participate in the
-migration. Fresh installations begin with an empty, visible new-conversation
-preset.
+In every mode Writing Buddy alone decides which vault material is eligible,
+performs the reads and enforces the budget. A connection receives text, not a
+path, a filesystem capability or vault access. AI output is always a candidate;
+only the local editing layer applies a rewrite, after checking the target range
+is unchanged.
+
+## Where things are stored
+
+- **Connection settings and credentials** live on this device only, never in the
+  vault. They are not synced, and are entered again after a fresh install.
+- **Per-conversation choices** (connection, provider, model, effort, context) are
+  stored per vault and per device, keyed by conversation. Deleting a conversation
+  clears its choice; renaming moves it.
+- **Conversation files** keep a safe record of which provider and model answered
+  each turn, for history. They contain no credential and no full endpoint URL.
 
 ## Health
 
-Connections are checked at startup, by the manual Test action, and by ordinary
-request success or failure. Rendering never triggers a health request. The
-header aggregates enabled Connection health and its popover shows each item.
+Connections are checked at startup, by the **Test** action and by ordinary
+request success or failure; rendering the interface never triggers a request.
+The header shows the overall state of enabled connections, and its popover lists
+each one. Authentication failures and rate limits are reported as such;
+interactive requests are not retried automatically.
 
-## Self-hosted Runtime authentication
+## What this is not
 
-Self-hosted Runtime uses only V2 paths and exactly one Authorization Bearer header.
-It never sends projectId or Cloudflare Access headers. A new Self-hosted Runtime
-Connection has no prefilled URL; LAN URLs and old static LAN
-tokens remain supported, and a public HTTPS URL may be entered when appropriate.
-
-The 获取 Token action opens BaseURL/auth/ in the system browser. Writing Buddy
-does not implement OAuth, callbacks, cookies, or an embedded login. Expiring
-rart_ tokens are validated with the V2 capabilities endpoint. Expiry metadata
-is cached from that response and from ordinary response headers. Missing expiry
-metadata means unknown or non-expiring, never expired.
-
-token_expired, unauthorized and rate_limited remain distinct. Ordinary
-interactive adapter calls do not retry rate limits automatically, and
-Retry-After is shown when supplied. The client-owned Full-corpus orchestrator
-may perform its separate bounded, deadline-aware retry because abandoning a
-long complete-coverage run has different semantics.
-
-## Non-goals
-
-This architecture does not implement automatic provider fallback, automatic
-Connection failover, model benchmarking, load balancing, best-model selection,
-or compare-model UI. It leaves room for future parallel targets without making
-those decisions silently today.
+Writing Buddy does not choose a provider for you, fall back to a second
+connection, benchmark or compare models, or balance load across endpoints. Each
+conversation talks to the connection you chose.
