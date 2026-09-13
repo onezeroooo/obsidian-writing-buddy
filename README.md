@@ -15,11 +15,22 @@ English | [简体中文](README.zh-CN.md)
 
 Write with context without leaving your manuscript behind. Writing Buddy keeps conversations, writing tools, and revision review alongside your work, while leaving every change to the text in your hands.
 
-| | |
-|---|---|
-| **Ask** | Select a passage and ask about it. Your note stays untouched. |
-| **Rewrite** | Run a writing action and review the proposed change before applying it. For Chinese prose, changes are shown as a character level diff. |
-| **Stay in control** | Writing Buddy will not apply an edit if the source text has changed while the result was being generated. You can undo an applied edit only while the original range is still safe to restore. |
+<table>
+  <tbody>
+    <tr>
+      <td><strong>Ask</strong></td>
+      <td>Select a passage and ask about it. Your note stays untouched.</td>
+    </tr>
+    <tr>
+      <td><strong>Rewrite</strong></td>
+      <td>Run a writing action and review the proposed change before applying it. For Chinese prose, changes are shown as a character level diff.</td>
+    </tr>
+    <tr>
+      <td><strong>Stay in control</strong></td>
+      <td>Writing Buddy will not apply an edit if the source text has changed while the result was being generated. You can undo an applied edit only while the original range is still safe to restore.</td>
+    </tr>
+  </tbody>
+</table>
 
 ## How it works
 
