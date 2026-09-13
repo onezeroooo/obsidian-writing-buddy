@@ -2,7 +2,7 @@
 
 # Writing Buddy
 
-**Long-form writing with AI inside Obsidian — ask, rewrite, review, and stay in control.**
+**Long-form writing with AI inside Obsidian: ask, rewrite, review, and stay in control.**
 
 English | [简体中文](README.zh-CN.md)
 
@@ -13,18 +13,17 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-Write with context, not around it. Writing Buddy keeps conversation, writing tools and revision
-review next to the manuscript, and leaves every change to the text in your hands.
+Write with context, without leaving your manuscript behind. Writing Buddy keeps conversations, writing tools, and revision review alongside your work, while leaving every change to the text in your hands.
 
 | | |
 |---|---|
-| **Ask** | Select a passage and ask about it. The note is not touched. |
-| **Rewrite** | A writing action produces a candidate. You read the change — Chinese prose as a character-level diff — before anything is applied. |
-| **Stay in control** | An edit whose source text moved while it was being generated is refused, not pasted over. An applied edit can be undone only while its target range is still safe to restore. |
+| **Ask** | Select a passage and ask about it. Your note stays untouched. |
+| **Rewrite** | Run a writing action and review the proposed change before applying it. For Chinese prose, changes are shown as a character-level diff. |
+| **Stay in control** | Writing Buddy will not apply a generated edit if the source text has changed underneath it. Applied edits can only be undone while the original range is still safe to restore. |
 
 ## How it works
 
-1. Work from the manuscript — select a passage, or start from the note you are in.
+1. Start from the manuscript, select a passage, or start from the note you are in.
 2. Ask a question, or run a writing action.
 3. Review the result. Nothing changes in the manuscript until you apply it.
 
