@@ -2,7 +2,7 @@
 
 # Writing Buddy
 
-**Long-form writing with AI inside Obsidian: ask, rewrite, review, and stay in control.**
+**Long form writing with AI inside Obsidian. Ask, rewrite, review, and stay in control.**
 
 English | [简体中文](README.zh-CN.md)
 
@@ -13,84 +13,71 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-Write with context, without leaving your manuscript behind. Writing Buddy keeps conversations, writing tools, and revision review alongside your work, while leaving every change to the text in your hands.
+Write with context without leaving your manuscript behind. Writing Buddy keeps conversations, writing tools, and revision review alongside your work, while leaving every change to the text in your hands.
 
 | | |
 |---|---|
 | **Ask** | Select a passage and ask about it. Your note stays untouched. |
-| **Rewrite** | Run a writing action and review the proposed change before applying it. For Chinese prose, changes are shown as a character-level diff. |
-| **Stay in control** | Writing Buddy will not apply a generated edit if the source text has changed underneath it. Applied edits can only be undone while the original range is still safe to restore. |
+| **Rewrite** | Run a writing action and review the proposed change before applying it. For Chinese prose, changes are shown as a character level diff. |
+| **Stay in control** | Writing Buddy will not apply an edit if the source text has changed while the result was being generated. You can undo an applied edit only while the original range is still safe to restore. |
 
 ## How it works
 
-1. Start from the manuscript, select a passage, or start from the note you are in.
-2. Ask a question, or run a writing action.
-3. Review the result. Nothing changes in the manuscript until you apply it.
+1. Start from the manuscript. Select a passage, or simply work from the note you are in.
+2. Ask a question or run a writing action.
+3. Review the result. Your manuscript does not change until you choose to apply it.
 
 ## Context that fits the task
 
-Each conversation chooses how much of the manuscript the AI may see. This is a Writing Buddy
-setting, separate from the model's own effort level.
+Each conversation controls how much of the manuscript the AI can work with. This is a Writing Buddy setting and is separate from the model's own effort level.
 
-| Mode | What the AI works from |
+| Mode | What the AI can work with |
 |---|---|
-| **Auto** | The agent decides: synthesize from local context, research the manuscript through bounded reads, or ask for complete coverage when correctness needs it. |
-| **Full** | The whole manuscript. |
-| **Low** | The selection, its surroundings and the active note — never other files. |
+| **Auto** | Writing Buddy chooses what the task needs. It can use nearby context, read more of the manuscript within a controlled budget, or use the full manuscript when the task depends on complete coverage. |
+| **Full** | The entire manuscript. |
+| **Low** | The selection, nearby context, and the active note. Other files are not included. |
 
-In every mode Writing Buddy alone decides which vault material is eligible, performs the reads and
-enforces the budget. No connection receives a path, a filesystem capability or direct vault access.
+In every mode, Writing Buddy decides which vault content is eligible, performs the reads itself, and enforces the context budget. Connections never receive vault paths, filesystem capabilities, or direct access to your files.
 
 ## Bring your own AI
 
-Add connections under **Settings → Writing Buddy → AI Connections**; each conversation picks one.
+Add connections under **Settings → Writing Buddy → AI Connections**. Each conversation can use its own connection.
 
-Pick a provider, enter its key, and choose a model. Writing Buddy connects to popular AI providers
-or to any OpenAI-compatible endpoint:
+Choose a provider, enter your key, and select a model. Writing Buddy supports popular AI providers as well as any OpenAI compatible endpoint:
 
-- **Providers** — OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Mistral, Groq, Cerebras,
-  Together AI, Fireworks AI, Perplexity, Hugging Face and SiliconFlow, each with your own key.
-- **Ollama** — models running on a machine you control. Writing Buddy never starts or manages the
-  model process.
-- **Custom OpenAI-compatible** — your own Base URL and, if needed, a key. The endpoint can be local,
-  on your LAN, remote or self-hosted; Writing Buddy does not require a specific backend.
+- **Providers:** OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Mistral, Groq, Cerebras, Together AI, Fireworks AI, Perplexity, Hugging Face, and SiliconFlow, using your own API key.
+- **Ollama:** connect to models running on a machine you control. Writing Buddy does not start or manage the model process.
+- **Custom OpenAI compatible:** connect to your own Base URL and, when required, an API key. The endpoint can be local, on your LAN, remote, or self hosted. Writing Buddy does not depend on a specific backend.
 
 ## Instructions and Skills
 
-- **Project instructions** — `WritingBuddy/instructions/project.md` holds guidance for the whole
-  project, in your own words.
-- **Bundled Skills** — eight writing tasks ship with the plugin and stay read-only. You can add a
-  customization on top of any of them, or reset it.
-- **Your Skills** — write your own; they live in the vault next to your customizations.
+- **Project instructions:** `WritingBuddy/instructions/project.md` contains guidance that applies across the whole project, written in your own words.
+- **Bundled Skills:** eight writing tasks are included with the plugin and remain read only. You can add your own customization to any of them or reset it at any time.
+- **Your Skills:** create your own Skills and keep them in the vault alongside your customizations.
 
-Instructions and Skills only add to the built-in rules. They cannot grant edit authority or turn
-manuscript text into commands. See [Writing skills](docs/SKILLS.md).
+Instructions and Skills extend Writing Buddy's built in rules. They cannot grant edit authority or make manuscript text behave like instructions. See [Writing skills](docs/SKILLS.md).
 
 ## Privacy and your data
 
-- **No Writing Buddy account.** You bring your own provider or endpoint, under its own terms.
-- **Your project data lives in the vault.** Conversations, instructions and Skills are ordinary
-  files under `WritingBuddy/`.
-- **Credentials stay on this device.** API keys and connection credentials are never written to
-  synced vault files.
+- **No Writing Buddy account.** You connect your own provider or endpoint, subject to its own terms.
+- **Your project data stays in the vault.** Conversations, instructions, and Skills are stored as ordinary files under `WritingBuddy/`.
+- **Credentials stay on this device.** API keys and connection credentials are never written to synced vault files.
 - **No telemetry or analytics.**
-- **What leaves the vault:** when you send a turn, the selected text, your instructions and the
-  context assembled under the chosen mode go to that conversation's connection — nothing else,
-  and nothing otherwise. Providers and endpoint operators apply their own privacy and data policies.
+- **What leaves the vault:** when you send a turn, Writing Buddy sends the selected text, your instructions, and the context assembled for the chosen mode to that conversation's connection. Nothing is sent when you are not making a request. Your provider or endpoint operator applies its own privacy and data policies.
 
 ## Quick Start
 
-1. In Obsidian, open **Settings → Community plugins → Browse**, search for **Writing Buddy** and
-   choose **Install**.
+1. In Obsidian, open **Settings → Community plugins → Browse**, search for **Writing Buddy**, and choose **Install**.
 2. Under **Community plugins → Installed plugins**, enable **Writing Buddy**.
 3. Add an AI connection under **Settings → Writing Buddy → AI Connections**.
 
-Updates arrive through Community plugins, like any other plugin.
+Updates are delivered through Community plugins, just like any other Obsidian plugin.
 
 ## Requirements
 
-Obsidian 1.4.5 or later, on desktop or mobile. On mobile, use a provider or endpoint that is reachable
-from the device; a model server listening only on another machine's loopback address is not reachable.
+Obsidian 1.4.5 or later, on desktop or mobile.
+
+On mobile, the provider or endpoint must be reachable from the device. A model server that only listens on another machine's loopback address cannot be reached from your phone or tablet.
 
 ## Documentation
 
@@ -99,10 +86,9 @@ from the device; a model server listening only on another machine's loopback add
 
 ## Source availability
 
-Writing Buddy is distributed under the MIT license. Its development source is maintained in a
-private repository; this public repository holds the distribution artifacts and user
-documentation. Obsidian Community reviewers are granted read access to the private source
-repository for review.
+Writing Buddy is distributed under the MIT license. Development takes place in a private repository, while this public repository contains the distribution artifacts and user documentation.
+
+Obsidian Community reviewers are granted read access to the private source repository for review.
 
 ## License
 
