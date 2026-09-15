@@ -6,7 +6,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-[![Obsidian 1.4.5+](https://img.shields.io/badge/Obsidian-1.4.5%2B-7C3AED?style=flat-square)](#quick-start)
+[![Obsidian 1.8.7+](https://img.shields.io/badge/Obsidian-1.8.7%2B-7C3AED?style=flat-square)](#quick-start)
 [![Desktop and mobile](https://img.shields.io/badge/platform-desktop%20%2B%20mobile-2F3437?style=flat-square)](#requirements)
 [![No telemetry](https://img.shields.io/badge/telemetry-none-2F5E33?style=flat-square)](#privacy-and-your-data)
 [![MIT](https://img.shields.io/badge/license-MIT-6B7280?style=flat-square)](LICENSE)
@@ -21,7 +21,13 @@ Bring your own model. Every generated edit stays a candidate until you choose **
 
 *From selection to suggestion to review, without leaving the manuscript.*
 
-If Writing Buddy is useful to you, [give it a star on GitHub](https://github.com/onezeroooo/obsidian-writing-buddy). Want to help with its upkeep? You can [buy me a coffee on Ko-fi](https://ko-fi.com/onezeroooo). Support is entirely optional; all plugin features are free.
+<p align="center">
+<a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers"><img src="https://img.shields.io/github/stars/onezeroooo/obsidian-writing-buddy?style=for-the-badge&logo=github&label=Star%20on%20GitHub" alt="Star Writing Buddy on GitHub"></a>
+&nbsp;
+<a href="https://ko-fi.com/onezeroooo"><img src="https://ko-fi.com/img/githubbutton_sm.svg" height="28" alt="Support onezeroooo on Ko-fi"></a>
+</p>
+
+<p align="center"><sub>Writing Buddy is free and open source. Support is entirely optional.</sub></p>
 
 ## Built for long-form writing
 
@@ -107,7 +113,7 @@ The provider or endpoint you choose has its own privacy and data policies.
 
 ## Quick Start
 
-**Community listing is not yet available.** The steps below apply once Writing Buddy is accepted into the directory. The [GitHub release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.1) contains the plugin files and release notes.
+**Community listing is not yet available.** The steps below apply once Writing Buddy is accepted into the directory. The [GitHub release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) contains the plugin files and release notes.
 
 1. Open **Settings → Community plugins → Browse** in Obsidian.
 2. Search for **Writing Buddy** and install it.
@@ -121,7 +127,7 @@ After setup, select a passage and try: *“Make this more restrained. Keep the d
 
 ## Requirements
 
-Obsidian 1.4.5 or later, on desktop or mobile.
+Obsidian 1.8.7 or later, on desktop or mobile.
 
 On mobile, the selected provider or endpoint must be reachable from the device. A model server listening only on another machine's loopback address cannot be reached from a phone or tablet.
 

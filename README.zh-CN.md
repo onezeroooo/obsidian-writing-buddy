@@ -6,7 +6,7 @@
 
 [English](README.md) | 简体中文
 
-[![Obsidian 1.4.5+](https://img.shields.io/badge/Obsidian-1.4.5%2B-7C3AED?style=flat-square)](#快速开始)
+[![Obsidian 1.8.7+](https://img.shields.io/badge/Obsidian-1.8.7%2B-7C3AED?style=flat-square)](#快速开始)
 [![桌面与移动端](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-%E6%A1%8C%E9%9D%A2%20%2B%20%E7%A7%BB%E5%8A%A8%E7%AB%AF-2F3437?style=flat-square)](#要求)
 [![无遥测](https://img.shields.io/badge/%E9%81%A5%E6%B5%8B-%E6%97%A0-2F5E33?style=flat-square)](#隐私与你的数据)
 [![MIT](https://img.shields.io/badge/license-MIT-6B7280?style=flat-square)](LICENSE)
@@ -21,7 +21,13 @@
 
 *选中正文，说明想怎么改，再决定留下哪些变化。*
 
-如果墨伴帮到了你的写作，欢迎[在 GitHub 点一颗 Star](https://github.com/onezeroooo/obsidian-writing-buddy)。也可以[在 Ko-fi 请我喝杯咖啡](https://ko-fi.com/onezeroooo)，支持后续维护。支持完全自愿，插件所有功能均免费使用。
+<p align="center">
+<a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers"><img src="https://img.shields.io/github/stars/onezeroooo/obsidian-writing-buddy?style=for-the-badge&logo=github&label=Star%20on%20GitHub" alt="在 GitHub 给 Writing Buddy 点 Star"></a>
+&nbsp;
+<a href="https://ko-fi.com/onezeroooo"><img src="https://ko-fi.com/img/githubbutton_sm.svg" height="28" alt="在 Ko-fi 支持 onezeroooo"></a>
+</p>
+
+<p align="center"><sub>Writing Buddy 免费且开源；支持完全自愿。</sub></p>
 
 ## 为长篇写作而设计
 
@@ -107,7 +113,7 @@
 
 ## 快速开始
 
-**目前尚未在社区目录上架。** 以下安装步骤适用于审核通过之后。[GitHub Release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.1) 已提供本版本的插件文件与更新说明。
+**目前尚未在社区目录上架。** 以下安装步骤适用于审核通过之后。[GitHub Release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) 已提供本版本的插件文件与更新说明。
 
 1. 在 Obsidian 中打开 **设置 → 第三方插件 → 浏览**。
 2. 搜索 **Writing Buddy** 并安装。
@@ -121,7 +127,7 @@
 
 ## 要求
 
-需要 Obsidian 1.4.5 或更高版本，桌面端和移动端都可以使用。
+需要 Obsidian 1.8.7 或更高版本，桌面端和移动端都可以使用。
 
 在移动端，所选服务商或端点必须能从当前设备访问。如果模型服务只监听另一台机器自己的回环地址，手机或平板无法连接它。
 

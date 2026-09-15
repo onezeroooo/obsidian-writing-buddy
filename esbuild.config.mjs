@@ -3,9 +3,12 @@ import process from "node:process";
 import { resolveBuildIdentity } from "./scripts/build-identity.mjs";
 
 const production = process.argv.includes("production");
-// Which build this is, decided here and frozen into the bundle: a development
-// build carries the short commit; WB_BUILD_CHANNEL=release makes a release.
-const buildId = resolveBuildIdentity();
+// Production builds must be reproducible from a release tag, so they always
+// carry the stable release identity. Watch/dev builds keep the short commit so
+// a sideloaded development bundle can still identify exactly what produced it.
+const buildId = production && process.env.WB_BUILD_CHANNEL !== "dev"
+	? resolveBuildIdentity({ ...process.env, WB_BUILD_CHANNEL: "release" })
+	: resolveBuildIdentity();
 
 const banner = `/*
 WritingBuddy / 墨伴 — Obsidian plugin bundle.

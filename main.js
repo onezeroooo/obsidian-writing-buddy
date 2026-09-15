@@ -15474,8 +15474,8 @@ function pressWithoutStealingFocus(button) {
   button.addEventListener("mousedown", (event) => event.preventDefault());
 }
 function grow(editor) {
-  editor.style.height = "auto";
-  editor.style.height = `${Math.min(editor.scrollHeight + 2, window.innerHeight * 0.6)}px`;
+  editor.setCssStyles({ height: "auto" });
+  editor.setCssStyles({ height: `${Math.min(editor.scrollHeight + 2, window.innerHeight * 0.6)}px` });
 }
 function renderToolbar(card, options) {
   const { candidate } = options;
@@ -15955,7 +15955,7 @@ function renderActionRow(parent, options) {
   iconSpan(more, ICONS.skills);
   more.createSpan({ text: t("composer.more") });
   more.disabled = options.busy || !active2;
-  if (menuSkills.length === 0) more.style.display = "none";
+  if (menuSkills.length === 0) more.setCssStyles({ display: "none" });
   more.addEventListener("click", (event) => {
     const menu = new import_obsidian10.Menu();
     for (const skill of menuSkills) {
@@ -15964,15 +15964,15 @@ function renderActionRow(parent, options) {
     menu.showAtMouseEvent(event);
   });
   const fit = () => {
-    for (const { button } of buttons) button.style.display = "";
+    for (const { button } of buttons) button.setCssStyles({ display: "" });
     menuSkills = [...overflow];
-    more.style.display = menuSkills.length === 0 ? "none" : "";
+    more.setCssStyles({ display: menuSkills.length === 0 ? "none" : "" });
     if (row.clientWidth === 0) return;
     for (let index = buttons.length - 1; index >= 0 && row.scrollWidth > row.clientWidth; index -= 1) {
       const demoted = buttons[index];
-      demoted.button.style.display = "none";
+      demoted.button.setCssStyles({ display: "none" });
       menuSkills = [demoted.skill, ...menuSkills];
-      more.style.display = "";
+      more.setCssStyles({ display: "" });
     }
   };
   if (typeof ResizeObserver !== "undefined") {
@@ -16101,8 +16101,8 @@ function closeOpenParamMenu() {
   open.menu.hide();
 }
 function autoGrow(input) {
-  input.style.height = "auto";
-  input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+  input.setCssStyles({ height: "auto" });
+  input.setCssStyles({ height: `${Math.min(input.scrollHeight, 180)}px` });
 }
 
 // src/ui/composerPreferences.ts

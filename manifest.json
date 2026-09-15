@@ -1,9 +1,9 @@
 {
 	"id": "writing-buddy",
 	"name": "Writing Buddy",
-	"version": "0.1.1",
-	"minAppVersion": "1.4.5",
-	"description": "Long-form AI writing in Obsidian with manuscript context, reviewable edits, writing skills, and bring-your-own models.",
+	"version": "0.1.2",
+	"minAppVersion": "1.8.7",
+	"description": "Long-form AI writing with manuscript context, reviewable edits, writing skills, and bring-your-own models.",
 	"author": "onezeroooo",
 	"authorUrl": "https://github.com/onezeroooo",
 	"fundingUrl": "https://ko-fi.com/onezeroooo",

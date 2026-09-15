@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-writing-buddy",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "WritingBuddy / 墨伴 — a writing-first AI workspace inside Obsidian.",
 	"main": "main.js",
 	"type": "module",

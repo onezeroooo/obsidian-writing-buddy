@@ -534,7 +534,7 @@ export function renderActionRow(parent: HTMLElement, options: ComposerOptions): 
 	iconSpan(more, ICONS.skills);
 	more.createSpan({ text: t("composer.more") });
 	more.disabled = options.busy || !active;
-	if (menuSkills.length === 0) more.style.display = "none";
+	if (menuSkills.length === 0) more.setCssStyles({ display: "none" });
 	more.addEventListener("click", (event) => {
 		const menu = new Menu();
 		for (const skill of menuSkills) {
@@ -552,17 +552,17 @@ export function renderActionRow(parent: HTMLElement, options: ComposerOptions): 
 	// assumption survives contact with them. The row never wraps or scrolls,
 	// which is the same "the row does not move" promise as above.
 	const fit = (): void => {
-		for (const { button } of buttons) button.style.display = "";
+		for (const { button } of buttons) button.setCssStyles({ display: "" });
 		menuSkills = [...overflow];
-		more.style.display = menuSkills.length === 0 ? "none" : "";
+		more.setCssStyles({ display: menuSkills.length === 0 ? "none" : "" });
 		// A detached or unmeasured row reports zero width; keep the count-based
 		// split rather than demoting everything into the menu.
 		if (row.clientWidth === 0) return;
 		for (let index = buttons.length - 1; index >= 0 && row.scrollWidth > row.clientWidth; index -= 1) {
 			const demoted = buttons[index];
-			demoted.button.style.display = "none";
+			demoted.button.setCssStyles({ display: "none" });
 			menuSkills = [demoted.skill, ...menuSkills];
-			more.style.display = "";
+			more.setCssStyles({ display: "" });
 		}
 	};
 	// The observer fires once on observe with real geometry — that is the
@@ -769,6 +769,6 @@ export function closeOpenParamMenu(): void {
 
 /** Grow the textarea with its content, up to a cap. */
 function autoGrow(input: HTMLTextAreaElement): void {
-	input.style.height = "auto";
-	input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+	input.setCssStyles({ height: "auto" });
+	input.setCssStyles({ height: `${Math.min(input.scrollHeight, 180)}px` });
 }

@@ -425,9 +425,9 @@
 
 /* Motion is decoration here; anyone who has asked for less gets none. */
 @media (prefers-reduced-motion: reduce) {
-	.wb-status-dot,
-	.wb-activity-pulse {
-		animation: none !important;
+	.wb-status-dot.wb-status-dot,
+	.wb-activity-pulse.wb-activity-pulse {
+		animation: none;
 	}
 }
 

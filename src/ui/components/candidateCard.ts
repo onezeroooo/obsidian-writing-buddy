@@ -199,8 +199,8 @@ function pressWithoutStealingFocus(button: HTMLElement): void {
 
 /** Grow the box with its content rather than scrolling inside a small one. */
 function grow(editor: HTMLTextAreaElement): void {
-	editor.style.height = "auto";
-	editor.style.height = `${Math.min(editor.scrollHeight + 2, window.innerHeight * 0.6)}px`;
+	editor.setCssStyles({ height: "auto" });
+	editor.setCssStyles({ height: `${Math.min(editor.scrollHeight + 2, window.innerHeight * 0.6)}px` });
 }
 
 function renderToolbar(card: HTMLElement, options: CandidateCardOptions): void {
