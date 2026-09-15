@@ -80,6 +80,7 @@ export const zh = {
 	"skillModal.fieldId": "技能 ID",
 	"skillModal.idKeep": "已有技能的 ID 保持不变。",
 	"skillModal.idFormat": "使用字母、数字、连字符或下划线。",
+	"skillModal.idPlaceholder": "scene-tension",
 	"skillModal.fieldName": "名称",
 	"skillModal.namePlaceholder": "场景张力检查",
 	"skillModal.descriptionDesc": "可选，在技能列表中帮助辨认用途。",

@@ -259,7 +259,7 @@ export class CustomSkillModal extends Modal {
 		});
 
 		new Setting(contentEl).setName(t("skillModal.fieldId")).setDesc(this.editing ? t("skillModal.idKeep") : t("skillModal.idFormat")).addText((text) =>
-			text.setPlaceholder("scene-tension").setValue(this.draft.id).setDisabled(this.editing).onChange((value) => { this.draft.id = value.trim(); }),
+			text.setPlaceholder(t("skillModal.idPlaceholder")).setValue(this.draft.id).setDisabled(this.editing).onChange((value) => { this.draft.id = value.trim(); }),
 		);
 		new Setting(contentEl).setName(t("skillModal.fieldName")).addText((text) =>
 			text.setPlaceholder(t("skillModal.namePlaceholder")).setValue(this.draft.name).onChange((value) => { this.draft.name = value; }),

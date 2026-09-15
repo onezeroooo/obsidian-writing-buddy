@@ -36,7 +36,7 @@ export const KNOWN_SKILL_FRONTMATTER_KEYS = new Set([
 /** Split a document into its frontmatter block and its body. */
 export function splitFrontmatter(source: string): { frontmatter: string | null; body: string } {
 	// Tolerate a UTF-8 BOM and leading blank lines before the opening fence.
-	const text = source.replace(/^﻿/, "");
+	const text = source.replace(/^\uFEFF/, "");
 	const match = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
 	if (!match) return { frontmatter: null, body: text };
 	return { frontmatter: match[1], body: text.slice(match[0].length) };

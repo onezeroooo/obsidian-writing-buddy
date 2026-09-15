@@ -69,7 +69,8 @@ export class StreamUnavailableError extends Error {
 
 /** A stream client over `fetch`; the renderer's own `fetch` unless a test hands one in. */
 export function fetchStreamClient(fetchImpl?: typeof fetch): StreamClient {
-	const doFetch = fetchImpl ?? (typeof fetch === "function" ? fetch.bind(globalThis) : undefined);
+	// `requestUrl` buffers the whole reply; token streaming needs a readable body.
+	const doFetch = fetchImpl ?? (typeof window.fetch === "function" ? window.fetch.bind(window) : undefined);
 	return async (request) => {
 		if (!doFetch) throw new StreamUnavailableError("fetch is not available");
 		let response: Response;

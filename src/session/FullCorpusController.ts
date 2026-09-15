@@ -40,6 +40,7 @@ import { buildSkillPayload, describeError, type TurnFacts } from "./Conversation
 import { conversationMessages } from "./conversationHistory";
 import { replaceExecutionIdentity, restoreSelectedExecutionIdentity, selectedExecutionIdentity } from "../util/executionIdentity";
 import { fullCorpusCacheKey, type FullCorpusMemoCache, type FullCorpusMemoKeyInput } from "../storage/FullCorpusMemoStore";
+import { asError } from "../util/errors";
 import {
 	DEFAULT_FULL_CORPUS_DEADLINE_MINUTES,
 	MAX_FULL_CORPUS_CONCURRENCY,
@@ -625,7 +626,7 @@ export class FullCorpusController {
 			}
 			return { ok: false, error: t("corpus.snapshotFailed", { reason: message }), metadata: { ...aggregateMetadata }, requestIds };
 		} finally {
-			clearTimeout(deadlineTimer);
+			window.clearTimeout(deadlineTimer);
 			if (this.activeJob === job) this.activeJob = null;
 		}
 	}
@@ -729,9 +730,9 @@ export class FullCorpusController {
 	private sleep(ms: number, signal: AbortSignal): Promise<void> {
 		if (signal.aborted) return Promise.resolve();
 		return new Promise<void>((resolve) => {
-			const timer = setTimeout(finish, ms);
+			const timer = window.setTimeout(finish, ms);
 			function finish(): void {
-				clearTimeout(timer);
+				window.clearTimeout(timer);
 				signal.removeEventListener("abort", finish);
 				resolve();
 			}
@@ -825,8 +826,8 @@ export class FullCorpusController {
 		};
 	}
 
-	private armDeadline(job: ActiveJob): ReturnType<typeof setTimeout> {
-		return setTimeout(() => {
+	private armDeadline(job: ActiveJob): number {
+		return window.setTimeout(() => {
 			if (this.activeJob !== job || job.cancelled || job.deadlineExceeded) return;
 			this.stopForDeadline(job);
 		}, Math.max(0, job.deadlineAt - this.now()));
@@ -964,7 +965,7 @@ function nextOrAbort<T>(
 		signal.addEventListener("abort", onAbort, { once: true });
 		next.then(
 			(value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
-			(error) => { signal.removeEventListener("abort", onAbort); reject(error); },
+			(error: unknown) => { signal.removeEventListener("abort", onAbort); reject(asError(error)); },
 		);
 	});
 }
@@ -979,7 +980,7 @@ function promiseOrAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T>
 		signal.addEventListener("abort", onAbort, { once: true });
 		promise.then(
 			(value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
-			(error) => { signal.removeEventListener("abort", onAbort); reject(error); },
+			(error: unknown) => { signal.removeEventListener("abort", onAbort); reject(asError(error)); },
 		);
 	});
 }
@@ -1200,7 +1201,7 @@ function allowedCitationIds(items: readonly EvidenceItem[]): Set<string> {
 
 function evidenceIdsIn(text: string): Set<string> {
 	const used = new Set<string>();
-	for (const match of text.matchAll(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
+	for (const match of text.matchAll(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
 		const ids = citationIdsInMarker(match[1]);
 		if (ids) for (const id of ids) used.add(id);
 	}
@@ -1209,7 +1210,7 @@ function evidenceIdsIn(text: string): Set<string> {
 
 /** Drop only our own unknown ids; ordinary bracketed prose is untouched. */
 function keepAllowedEvidenceIds(text: string, allowed: ReadonlySet<string>): string {
-	return normalizeCitationRanges(text, allowed).replace(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu, (whole, group: string) => {
+	return normalizeCitationRanges(text, allowed).replace(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu, (whole, group: string) => {
 		const ids = citationIdsInMarker(group);
 		if (!ids) return whole;
 		return ids
@@ -1221,7 +1222,7 @@ function keepAllowedEvidenceIds(text: string, allowed: ReadonlySet<string>): str
 
 /** Expand only unambiguous, fully admitted block ranges; never infer missing evidence. */
 function normalizeCitationRanges(text: string, allowed: ReadonlySet<string>): string {
-	return text.replace(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu, (whole, group: string) => {
+	return text.replace(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu, (whole, group: string) => {
 		const range = /^\s*(S[1-9]\d*)\.B([1-9]\d*)\s*[-–—]\s*(S[1-9]\d*)\.B([1-9]\d*)\s*$/iu.exec(group);
 		if (!range || range[1].toUpperCase() !== range[3].toUpperCase()) return whole;
 		const start = Number(range[2]), end = Number(range[4]);
@@ -1233,7 +1234,7 @@ function normalizeCitationRanges(text: string, allowed: ReadonlySet<string>): st
 
 /** Internal memos may be dense, but malformed or unknown citations are not cacheable. */
 function memoCitationProblem(text: string, allowed: ReadonlySet<string>): string | null {
-	for (const match of text.matchAll(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
+	for (const match of text.matchAll(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
 		const ids = citationIdsInMarker(match[1]);
 		if (!ids) {
 			if (/\bS\d+\b/iu.test(match[1])) return match[0];
@@ -1256,7 +1257,7 @@ function finalCitationProblem(
 	requireCitation = false,
 ): string | null {
 	const citedIds = new Set<string>();
-	for (const match of text.matchAll(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
+	for (const match of text.matchAll(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)) {
 		const ids = citationIdsInMarker(match[1]);
 		if (!ids) {
 			if (/\bS\d+\b/iu.test(match[1])) return t("corpus.badCitation", { marker: match[0] });
@@ -1271,7 +1272,7 @@ function finalCitationProblem(
 	}
 
 	for (const claim of citationClaims(text)) {
-		const ids = [...claim.matchAll(/[\[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)]
+		const ids = [...claim.matchAll(/[[【]\s*([^\]】\n]{1,200})\s*[\]】]/gu)]
 			.flatMap((group) => citationIdsInMarker(group[1]) ?? []);
 		if (ids.length === 0) continue;
 		const unique = new Set(ids);
@@ -1610,11 +1611,15 @@ function beginPhase(job: ActiveJob, phase: FullCorpusPhase): void {
 	job.activePhase = { phase, startedAt: job.now() };
 }
 
+/** The timings field a phase accumulates into. */
+function phaseTimingKey(phase: FullCorpusPhase): Exclude<keyof CorpusPhaseTimings, "totalMs"> {
+	return `${phase}Ms`;
+}
+
 function finishActivePhase(job: ActiveJob): void {
 	const active = job.activePhase;
 	if (!active) return;
-	const key = `${active.phase}Ms` as Exclude<keyof CorpusPhaseTimings, "totalMs">;
-	job.timings[key] += elapsedMs(active.startedAt, job.now());
+	job.timings[phaseTimingKey(active.phase)] += elapsedMs(active.startedAt, job.now());
 	job.activePhase = null;
 }
 
@@ -1625,8 +1630,7 @@ function elapsedMs(startedAt: number, endedAt: number): number {
 function timingsFor(job: ActiveJob): CorpusPhaseTimings {
 	const timings = { ...job.timings, totalMs: elapsedMs(job.startedAt, job.now()) };
 	if (job.activePhase) {
-		const key = `${job.activePhase.phase}Ms` as Exclude<keyof CorpusPhaseTimings, "totalMs">;
-		timings[key] += elapsedMs(job.activePhase.startedAt, job.now());
+		timings[phaseTimingKey(job.activePhase.phase)] += elapsedMs(job.activePhase.startedAt, job.now());
 	}
 	return timings;
 }
@@ -1715,7 +1719,7 @@ function mergeMetadata(target: GenerationMetadata, source: GenerationMetadata): 
 
 function mergeFacts(target: TurnFacts, source: TurnFacts): void {
 	for (const key of ["cachedInputTokens", "reasoningTokens", "runtimeMs", "attempts"] as const) {
-		if (source[key] !== undefined) target[key] = (target[key] ?? 0) + source[key]!;
+		if (source[key] !== undefined) target[key] = (target[key] ?? 0) + source[key];
 	}
 	if (source.granularity) target.granularity = source.granularity;
 }

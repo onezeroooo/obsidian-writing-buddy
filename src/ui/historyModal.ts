@@ -325,11 +325,11 @@ export class HistoryModal extends Modal {
 				icon: ICONS.unarchive,
 				label: t("history.unarchive"),
 				cls: "wb-history-action",
-				onClick: async (event) => {
+				onClick: (event) => {
 					event.stopPropagation();
 					// Taking something back out is not a decision that needs
 					// confirming; putting it away was.
-					if (await this.options.onArchive(session, false)) this.renderList();
+					void this.options.onArchive(session, false).then((restored) => { if (restored) this.renderList(); });
 				},
 			});
 		} else {
@@ -337,9 +337,9 @@ export class HistoryModal extends Modal {
 				icon: ICONS.archive,
 				label: t("history.archive"),
 				cls: "wb-history-action",
-				onClick: async (event) => {
+				onClick: (event) => {
 					event.stopPropagation();
-					if (await this.options.onArchive(session, true)) this.renderList();
+					void this.options.onArchive(session, true).then((archived) => { if (archived) this.renderList(); });
 				},
 			});
 		}
@@ -348,9 +348,9 @@ export class HistoryModal extends Modal {
 			icon: ICONS.remove,
 			label: t("modals.deletePermanently"),
 			cls: "wb-history-action is-destructive",
-			onClick: async (event) => {
+			onClick: (event) => {
 				event.stopPropagation();
-				if (await this.options.onDelete(session)) this.renderList();
+				void this.options.onDelete(session).then((deleted) => { if (deleted) this.renderList(); });
 			},
 		});
 	}

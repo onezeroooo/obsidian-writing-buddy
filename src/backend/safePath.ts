@@ -17,7 +17,7 @@ const URI_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/u;
 const EMBEDDED_URI = /(?:^|[^\p{L}\p{N}])(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|(?:file|obsidian):)/iu;
 const WINDOWS_ABSOLUTE = /[A-Za-z]:\//u;
 const UNIX_ABSOLUTE_TOKEN = /(?:^|[^\p{L}\p{N}_.-])\/(?=[^/\s])/u;
-const TRAVERSAL_TOKEN = /(?:^|[\/\s([{"'=])\.\.(?=\/)|(?:^|\/)\.\.$/u;
+const TRAVERSAL_TOKEN = /(?:^|[/\s([{"'=])\.\.(?=\/)|(?:^|\/)\.\.$/u;
 const EVIDENCE_PREFIX = /^\[S[1-9]\d*\] /u;
 const EVIDENCE_LABEL = /^\[S[1-9]\d*\] (.+)（([^（）]+)）$/u;
 const EVIDENCE_HEADING_SEPARATOR = " · ";

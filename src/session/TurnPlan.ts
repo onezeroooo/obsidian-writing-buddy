@@ -98,7 +98,7 @@ export function snapshotSkill<T extends Skill>(skill: T): T {
 		...(skill.routing
 			? { routing: Object.freeze({ ...skill.routing, phrases: Object.freeze([...skill.routing.phrases]) }) }
 			: {}),
-	}) as T;
+	});
 }
 
 /** Deep-freeze the mutable pieces that execution is allowed to consume. */

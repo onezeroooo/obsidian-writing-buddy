@@ -287,7 +287,7 @@ function classifySource(source: string, path: string, hash: string): ClassifiedS
 		return { classification: "malformed", detail: parsed.reason };
 	}
 
-	const normalizedHash = hashSkillSource(source.replace(/^﻿/u, "").replace(/\r\n?/gu, "\n"));
+	const normalizedHash = hashSkillSource(source.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n"));
 	const historical = findHistoricalBuiltin(parsed.skill.id, hash) ??
 		findHistoricalBuiltin(parsed.skill.id, normalizedHash) ??
 		findCanonicalHistoricalBuiltin(parsed.skill.id, source);
@@ -323,7 +323,7 @@ function classifySource(source: string, path: string, hash: string): ClassifiedS
 const CURRENT_BUILTIN_IDS = new Set(BUILTIN_SKILLS.map((skill) => skill.id));
 
 function replacementSource(source: string, skill: Parameters<typeof serializeSkill>[0], metadata: SkillFileMetadata): string {
-	const frontmatter = /^﻿?\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/u.exec(source)?.[1];
+	const frontmatter = /^\uFEFF?\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/u.exec(source)?.[1];
 	if (frontmatter === undefined) return serializeSkill(skill, metadata);
 	const preserved: string[] = [];
 	for (const rawLine of frontmatter.split(/\r?\n/u)) {

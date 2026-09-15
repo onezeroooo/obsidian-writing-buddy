@@ -1,12 +1,12 @@
 /** WritingBuddy settings: connections, session defaults, and writer-owned Skills. */
 import { buildLabel } from "../buildInfo";
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, type SettingDefinition, type SettingDefinitionItem, type SettingGroupItem } from "obsidian";
 import type WritingBuddyPlugin from "../main";
 import { getLocale, t } from "../i18n";
 import { ICONS, iconSpan } from "./icons";
 import { ConfirmModal } from "./modals";
 import { ConnectionModal } from "./connectionModal";
-import { connectionSnapshot, connectionSummary } from "../connections/types";
+import { connectionSnapshot, connectionSummary, type ConnectionRecord } from "../connections/types";
 import { healthLabel } from "./components/header";
 import { SESSION_RECOMMENDED_LIMIT } from "../session/SessionManager";
 import { CONTEXT_DEPTHS, contextDepthLabel } from "../context/types";
@@ -22,6 +22,7 @@ import {
 	projectInstructionsPresentation,
 } from "./projectInstructionsModal";
 import { PROJECT_INSTRUCTIONS_PATH, type ProjectInstructionsState } from "../instructions";
+import { markDestructive } from "./components/destructiveButton";
 import {
 	MAX_FULL_CORPUS_CONCURRENCY,
 	MAX_FULL_CORPUS_DEADLINE_MINUTES,
@@ -29,16 +30,198 @@ import {
 	MIN_FULL_CORPUS_DEADLINE_MINUTES,
 } from "../session/fullCorpusLimits";
 
+/** A dropdown the page offers, in a form both renderers understand. */
+interface DropdownSpec {
+	/** The key Obsidian 1.13 passes back through `getControlValue` / `setControlValue`. */
+	key: string;
+	name: string;
+	desc: string;
+	options: Record<string, string>;
+	value: string;
+	disabled?: boolean;
+	onChange: (value: string) => Promise<void> | void;
+}
+
 export class WritingBuddySettingTab extends PluginSettingTab {
 	private testingConnectionId: string | null = null;
-	private displayEpoch = 0;
 
 	constructor(app: App, private readonly plugin: WritingBuddyPlugin) {
 		super(app, plugin);
 	}
 
+	// -------------------------------------------------------------------------
+	// Obsidian 1.13 and later: the page is described rather than drawn, so every
+	// control below is indexed by Settings search. `display()` further down is
+	// the same page drawn by hand, for installs between minAppVersion and 1.13;
+	// Obsidian does not call it once definitions are returned.
+	// -------------------------------------------------------------------------
+
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		// The stylesheet's container queries measure the tab, on either path.
+		this.containerEl.addClass("wb-settings");
+		const [uiLanguage, instructionLanguage] = this.languageRows();
+		const descriptors = this.plugin.skillDescriptors();
+		const builtin = descriptors.filter((descriptor) => descriptor.ownership === "builtin");
+		const own = descriptors.filter((descriptor) => descriptor.ownership !== "builtin");
+		const problems = this.plugin.skillLoadProblems();
+		const skills: SettingGroupItem[] = [
+			{ name: t("settings.instructions.name"), render: (setting) => this.projectInstructionsRow(setting) },
+		];
+		if (builtin.length > 0) {
+			skills.push({
+				type: "page",
+				name: `${t("settings.skills.groupBuiltin")} · ${builtin.length}`,
+				items: [{ type: "group", items: builtin.map((descriptor) => this.skillDefinition(descriptor)) }],
+			});
+		}
+		for (const descriptor of own) skills.push(this.skillDefinition(descriptor));
+		skills.push({
+			name: t("settings.skills.create"),
+			desc: t("settings.skills.createDesc"),
+			render: (setting) => this.createSkillRow(setting),
+		});
+		if (problems.length > 0) {
+			skills.push({
+				name: t("settings.skills.problemsTitle", { count: problems.length }),
+				searchable: false,
+				render: (setting) => this.skillProblemsRow(setting),
+			});
+		}
+		return [
+			this.dropdownDefinition(uiLanguage),
+			this.dropdownDefinition(instructionLanguage),
+			{
+				type: "list",
+				heading: t("settings.section.connections"),
+				emptyState: t("settings.connections.empty"),
+				items: this.plugin.connectionRecords().map((record) => ({
+					name: record.connection.name,
+					desc: connectionSummary(record.connection),
+					render: (setting: Setting) => this.connectionRow(setting, record),
+				})),
+				addItem: {
+					name: t("settings.connections.addButton"),
+					action: () => new ConnectionModal(this.app, this.plugin, undefined, () => this.rerender()).open(),
+				},
+			},
+			{
+				type: "group",
+				heading: t("settings.section.defaults"),
+				items: this.newConversationDefaultRows().map((spec) => this.dropdownDefinition(spec)),
+			},
+			{ type: "group", heading: t("settings.section.skills"), items: skills },
+			{
+				type: "group",
+				heading: t("settings.section.projectData"),
+				items: [
+					{ name: t("settings.sessions.name"), render: (setting) => this.sessionsRow(setting, null) },
+					{ name: t("settings.storage.name"), render: (setting) => this.storageRow(setting, null) },
+				],
+			},
+			{
+				type: "page",
+				name: t("settings.section.advanced"),
+				items: [{ type: "group", items: this.advancedRows().map((spec) => this.dropdownDefinition(spec)) }],
+			},
+			{
+				type: "group",
+				heading: t("settings.section.updates"),
+				items: [{ name: buildLabel(this.plugin.manifest.version), desc: t("settings.version.installedDesc"), searchable: false }],
+			},
+		];
+	}
+
+	getControlValue(key: string): unknown {
+		return this.dropdownSpecs().find((spec) => spec.key === key)?.value;
+	}
+
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		const spec = this.dropdownSpecs().find((item) => item.key === key);
+		if (spec && typeof value === "string") await spec.onChange(value);
+	}
+
+	/** Plugin data changed elsewhere; on 1.13+ the described page re-reads it. */
+	refresh(): void {
+		const update = (this as { update?: () => void }).update;
+		if (typeof update === "function") update.call(this);
+	}
+
+	/** After an action on this page: re-read the definitions, or redraw by hand. */
+	private rerender(): void {
+		const update = (this as { update?: () => void }).update;
+		if (typeof update === "function") update.call(this);
+		else this.display();
+	}
+
+	private dropdownSpecs(): DropdownSpec[] {
+		return [...this.languageRows(), ...this.newConversationDefaultRows(), ...this.advancedRows()];
+	}
+
+	private dropdownDefinition(spec: DropdownSpec): SettingDefinition {
+		return {
+			name: spec.name,
+			desc: spec.desc,
+			control: { type: "dropdown", key: spec.key, options: spec.options, disabled: spec.disabled ?? false },
+		};
+	}
+
+	private dropdownRow(containerEl: HTMLElement, spec: DropdownSpec): Setting {
+		return new Setting(containerEl)
+			.setName(spec.name)
+			.setDesc(spec.desc)
+			.addDropdown((dropdown) => dropdown
+				.addOptions(spec.options)
+				.setValue(spec.value)
+				.setDisabled(spec.disabled ?? false)
+				.onChange((value) => void spec.onChange(value)));
+	}
+
+	private skillDefinition(descriptor: SkillDescriptor): SettingDefinition {
+		return {
+			name: descriptor.skill.name,
+			desc: this.skillRowDescription(descriptor),
+			render: (setting) => this.skillRow(setting, descriptor),
+		};
+	}
+
+	/** The two language choices; one per device, one per project. */
+	private languageRows(): DropdownSpec[] {
+		return [
+			{
+				key: "uiLocale",
+				name: t("settings.language.name"),
+				desc: t("settings.language.desc"),
+				options: {
+					auto: t("settings.language.auto"),
+					en: t("settings.language.en"),
+					zh: t("settings.language.zh"),
+				},
+				value: this.plugin.deviceSettings.uiLocale ?? "auto",
+				onChange: async (value) => {
+					await this.plugin.setUiLocale(value === "en" || value === "zh" ? value : "auto");
+					this.rerender();
+				},
+			},
+			{
+				key: "instructionLanguage",
+				name: t("settings.instrLang.name"),
+				desc: this.plugin.projectMetadata ? t("settings.instrLang.desc") : t("settings.instrLang.loading"),
+				options: { auto: t("settings.instrLang.auto"), en: t("settings.language.en"), zh: t("settings.language.zh") },
+				value: this.plugin.projectMetadata?.instructionLanguage ?? "auto",
+				disabled: !this.plugin.projectMetadata,
+				onChange: async (value) => {
+					await this.plugin.setInstructionLanguage(value === "en" || value === "zh" ? value : "auto");
+					this.rerender();
+				},
+			},
+		];
+	}
+
+	// -------------------------------------------------------------------------
+	// Before Obsidian 1.13: the same page, drawn by hand.
+	// -------------------------------------------------------------------------
+
 	display(): void {
-		this.displayEpoch += 1;
 		const { containerEl } = this;
 		// Every action in here re-renders the whole page, which sends the
 		// scroller back to the top: pressing 检查更新 near the bottom threw the
@@ -58,34 +241,10 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		const title = content.createDiv({ cls: "wb-settings-title" });
 		iconSpan(title, ICONS.brand, "wb-settings-title-icon");
 		title.createSpan({ text: t("settings.pluginName") });
-		// Above the sections: it changes the words every row below is written in.
-		new Setting(content)
-			.setName(t("settings.language.name"))
-			.setDesc(t("settings.language.desc"))
-			.addDropdown((dropdown) => dropdown
-				.addOptions({
-					auto: t("settings.language.auto"),
-					en: t("settings.language.en"),
-					zh: t("settings.language.zh"),
-				})
-				.setValue(this.plugin.deviceSettings.uiLocale ?? "auto")
-				.onChange(async (value) => {
-					await this.plugin.setUiLocale(value === "en" || value === "zh" ? value : "auto");
-					this.display();
-				}));
-		// Its sibling, but the other axis: the language of the manuscript's
-		// prompts and skills, stored with the project rather than the device.
-		const instrLang = new Setting(content)
-			.setName(t("settings.instrLang.name"))
-			.setDesc(this.plugin.projectMetadata ? t("settings.instrLang.desc") : t("settings.instrLang.loading"));
-		instrLang.addDropdown((dropdown) => dropdown
-			.addOptions({ auto: t("settings.instrLang.auto"), en: t("settings.language.en"), zh: t("settings.language.zh") })
-			.setValue(this.plugin.projectMetadata?.instructionLanguage ?? "auto")
-			.setDisabled(!this.plugin.projectMetadata)
-			.onChange(async (value) => {
-				await this.plugin.setInstructionLanguage(value === "en" || value === "zh" ? value : "auto");
-				this.display();
-			}));
+		// Above the sections: the interface language changes the words every row
+		// below is written in; its sibling is the other axis, the language of the
+		// manuscript's prompts and skills, stored with the project rather than the device.
+		for (const spec of this.languageRows()) this.dropdownRow(content, spec);
 		// Section headings carry no description. Obsidian's own settings state
 		// the rule on the row it applies to, and a paragraph under every heading
 		// pushed the first real control below the fold.
@@ -132,11 +291,11 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		heading.addExtraButton((button) => button
 			.setIcon(open ? "chevron-down" : "chevron-right")
 			.setTooltip(open ? t("settings.group.hide") : t("settings.group.show"))
-			.onClick(() => { this.folds.set(key, !open); this.display(); }));
+			.onClick(() => { this.folds.set(key, !open); this.rerender(); }));
 		heading.settingEl.addEventListener("click", (event) => {
 			if ((event.target as HTMLElement).closest("button")) return;
 			this.folds.set(key, !open);
-			this.display();
+			this.rerender();
 		});
 	}
 
@@ -185,71 +344,8 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		}
 
 		for (const record of records) {
-			const setting = new Setting(containerEl)
-				.setClass("mod-navigable")
-				.setClass("wb-connection-card")
-				.setName(record.connection.name);
-			const row = setting.settingEl;
-			row.tabIndex = 0;
-			row.setAttribute("role", "button");
-			row.setAttribute("aria-label", t("settings.connections.editAria", { name: record.connection.name }));
-			row.addEventListener("click", () => new ConnectionModal(this.app, this.plugin, record.connection, () => this.display()).open());
-			row.addEventListener("keydown", (event) => {
-				if (event.key === "Enter" || event.key === " ") {
-					event.preventDefault();
-					new ConnectionModal(this.app, this.plugin, record.connection, () => this.display()).open();
-				}
-			});
-			setting.infoEl.addClass("wb-connection-card-copy");
-			setting.nameEl.addClass("wb-connection-card-name");
-			setting.nameEl.setAttribute("title", record.connection.name);
-			// The dot belongs to the connection's name, so it sits after it. In
-			// the row's first column it read as a bullet marking the whole row
-			// and left the names indented away from every other setting on the
-			// page. The name is rewrapped in its own span so it, not the dot,
-			// is what an over-long name truncates.
-			setting.nameEl.empty();
-			setting.nameEl.createSpan({ cls: "wb-connection-card-label", text: record.connection.name });
-			// It used to sit beside a 已连接 label that repeated it. With the label
-			// gone the dot is the only carrier of health, so it stops being
-			// decorative and has to name the state for a screen reader.
-			setting.nameEl.createSpan({
-				cls: "wb-connection-health-dot is-" + record.health.kind,
-				attr: { role: "img", "aria-label": healthLabel(record.health.kind) },
-			});
-			setting.descEl.addClass("wb-connection-card-description");
-			setting.descEl.createDiv({
-				cls: "wb-connection-card-type",
-				text: connectionSummary(record.connection),
-			});
-			// Only surfaced when something is wrong. A healthy connection says so
-			// with the dot and otherwise stays quiet.
-			if (record.health.detail) {
-				setting.descEl.createDiv({ cls: "wb-connection-card-error", text: record.health.detail });
-			}
-			setting.controlEl.addEventListener("click", (event) => event.stopPropagation());
-			setting.controlEl.addEventListener("keydown", (event) => event.stopPropagation());
-			setting
-				.addToggle((toggle) => toggle
-					.setTooltip(record.connection.enabled ? t("settings.connections.disableTooltip") : t("settings.connections.enableTooltip"))
-					.setValue(record.connection.enabled)
-					.onChange(async (value) => {
-						await this.plugin.setConnectionEnabled(record.connection.id, value);
-						this.display();
-					}))
-				.addButton((button) => {
-					const testing = this.testingConnectionId === record.connection.id;
-					button.setButtonText(testing ? t("settings.connections.testing") : t("settings.connections.test")).setDisabled(this.testingConnectionId !== null).onClick(async () => {
-						this.testingConnectionId = record.connection.id;
-						this.display();
-						try { await this.plugin.testConnection(record.connection.id); }
-						catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
-						finally { this.testingConnectionId = null; this.display(); }
-					});
-				})
-				.addButton((button) => button.setButtonText(t("common.edit")).onClick(() => {
-					new ConnectionModal(this.app, this.plugin, record.connection, () => this.display()).open();
-				}));
+			const setting = new Setting(containerEl);
+			this.connectionRow(setting, record);
 		}
 
 		new Setting(containerEl)
@@ -258,10 +354,85 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 			.addButton((button) => button
 				.setButtonText(t("settings.connections.addButton"))
 				.setCta()
-				.onClick(() => new ConnectionModal(this.app, this.plugin, undefined, () => this.display()).open()));
+				.onClick(() => new ConnectionModal(this.app, this.plugin, undefined, () => this.rerender()).open()));
+	}
+
+	/** One connection: its name and health, a toggle, and Test / Edit. The whole row opens the editor. */
+	private connectionRow(setting: Setting, record: ConnectionRecord): void {
+		setting
+			.setClass("mod-navigable")
+			.setClass("wb-connection-card")
+			.setName(record.connection.name);
+		const row = setting.settingEl;
+		row.tabIndex = 0;
+		row.setAttribute("role", "button");
+		row.setAttribute("aria-label", t("settings.connections.editAria", { name: record.connection.name }));
+		row.addEventListener("click", () => new ConnectionModal(this.app, this.plugin, record.connection, () => this.rerender()).open());
+		row.addEventListener("keydown", (event) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				new ConnectionModal(this.app, this.plugin, record.connection, () => this.rerender()).open();
+			}
+		});
+		setting.infoEl.addClass("wb-connection-card-copy");
+		setting.nameEl.addClass("wb-connection-card-name");
+		setting.nameEl.setAttribute("title", record.connection.name);
+		// The dot belongs to the connection's name, so it sits after it. In
+		// the row's first column it read as a bullet marking the whole row
+		// and left the names indented away from every other setting on the
+		// page. The name is rewrapped in its own span so it, not the dot,
+		// is what an over-long name truncates.
+		setting.nameEl.empty();
+		setting.nameEl.createSpan({ cls: "wb-connection-card-label", text: record.connection.name });
+		// It used to sit beside a 已连接 label that repeated it. With the label
+		// gone the dot is the only carrier of health, so it stops being
+		// decorative and has to name the state for a screen reader.
+		setting.nameEl.createSpan({
+			cls: "wb-connection-health-dot is-" + record.health.kind,
+			attr: { role: "img", "aria-label": healthLabel(record.health.kind) },
+		});
+		setting.descEl.empty();
+		setting.descEl.addClass("wb-connection-card-description");
+		setting.descEl.createDiv({
+			cls: "wb-connection-card-type",
+			text: connectionSummary(record.connection),
+		});
+		// Only surfaced when something is wrong. A healthy connection says so
+		// with the dot and otherwise stays quiet.
+		if (record.health.detail) {
+			setting.descEl.createDiv({ cls: "wb-connection-card-error", text: record.health.detail });
+		}
+		setting.controlEl.addEventListener("click", (event) => event.stopPropagation());
+		setting.controlEl.addEventListener("keydown", (event) => event.stopPropagation());
+		setting
+			.addToggle((toggle) => toggle
+				.setTooltip(record.connection.enabled ? t("settings.connections.disableTooltip") : t("settings.connections.enableTooltip"))
+				.setValue(record.connection.enabled)
+				.onChange(async (value) => {
+					await this.plugin.setConnectionEnabled(record.connection.id, value);
+					this.rerender();
+				}))
+			.addButton((button) => {
+				const testing = this.testingConnectionId === record.connection.id;
+				button.setButtonText(testing ? t("settings.connections.testing") : t("settings.connections.test")).setDisabled(this.testingConnectionId !== null).onClick(async () => {
+					this.testingConnectionId = record.connection.id;
+					this.rerender();
+					try { await this.plugin.testConnection(record.connection.id); }
+					catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
+					finally { this.testingConnectionId = null; this.rerender(); }
+				});
+			})
+			.addButton((button) => button.setButtonText(t("common.edit")).onClick(() => {
+				new ConnectionModal(this.app, this.plugin, record.connection, () => this.rerender()).open();
+			}));
 	}
 
 	private renderNewConversationDefaults(containerEl: HTMLElement): void {
+		for (const spec of this.newConversationDefaultRows()) this.dropdownRow(containerEl, spec);
+	}
+
+	/** Connection → Provider → Model → Effort, each narrowing the next, then Context. */
+	private newConversationDefaultRows(): DropdownSpec[] {
 		const defaults = this.plugin.deviceSettings.newConversationDefaults;
 		const enabled = this.plugin.connectionRecords().filter((record) => record.connection.enabled);
 		const capabilities = this.plugin.connectionCapabilities(defaults.connectionId);
@@ -270,119 +441,146 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		const model = models.find((item) => item.id === defaults.model);
 		const efforts = model?.efforts ?? provider?.efforts ?? [];
 
-		new Setting(containerEl).setName(t("label.connection")).setDesc(t("settings.defaults.connectionDesc")).addDropdown((dropdown) => {
-			const options: Record<string, string> = { "": t("common.unset") };
-			for (const record of enabled) options[record.connection.id] = record.connection.name;
-			return dropdown.addOptions(options).setValue(defaults.connectionId ?? "").onChange(async (connectionId) => {
-				const connection = this.plugin.connection(connectionId);
-				const next: SessionPreferences = defaults.contextDepth ? { contextDepth: defaults.contextDepth } : {};
-				if (connection) {
-					const snapshot = connectionSnapshot(connection);
-					next.connectionId = snapshot.id;
-					next.connectionName = snapshot.name;
-					next.connectionType = snapshot.type;
-					if (snapshot.detail) next.connectionDetail = snapshot.detail;
-				}
-				await this.plugin.setNewConversationDefaults(next);
-				this.display();
-				if (connection) {
-					void this.plugin.testConnection(connection.id).then(() => this.display());
-				}
-			});
-		});
+		const connectionOptions: Record<string, string> = { "": t("common.unset") };
+		for (const record of enabled) connectionOptions[record.connection.id] = record.connection.name;
+		const providerOptions: Record<string, string> = { "": t("common.unset") };
+		for (const item of capabilities.providers) providerOptions[item.id] = providerDisplayName(item.id, item.label);
+		const modelOptions: Record<string, string> = { "": t("common.unset") };
+		for (const item of models) modelOptions[item.id] = item.label ?? item.id;
+		const effortOptions: Record<string, string> = { "": efforts.length ? t("common.unset") : t("common.unsupported") };
+		if (efforts.length) effortOptions.auto = t("composer.effortServerDefault");
+		for (const item of efforts) effortOptions[item.id] = item.label ?? item.id;
+		const contextOptions: Record<string, string> = {};
+		for (const depth of CONTEXT_DEPTHS) contextOptions[depth.id] = contextDepthLabel(depth.id);
 
-		new Setting(containerEl).setName(t("label.provider")).setDesc(defaults.connectionId ? t("settings.defaults.providerDesc") : t("settings.defaults.selectConnectionFirst")).addDropdown((dropdown) => {
-			const options: Record<string, string> = { "": t("common.unset") };
-			for (const item of capabilities.providers) options[item.id] = providerDisplayName(item.id, item.label);
-			return dropdown.addOptions(options).setValue(defaults.provider ?? "").setDisabled(!defaults.connectionId).onChange(async (providerId) => {
-				await this.plugin.setNewConversationDefaults({
-					...this.plugin.deviceSettings.newConversationDefaults,
-					provider: providerId || undefined,
-					model: undefined,
-					effort: undefined,
-				});
-				this.display();
-			});
-		});
-
-		new Setting(containerEl).setName(t("label.model")).setDesc(defaults.provider ? t("settings.defaults.modelDesc") : t("settings.defaults.selectProviderFirst")).addDropdown((dropdown) => {
-			const options: Record<string, string> = { "": t("common.unset") };
-			for (const item of models) options[item.id] = item.label ?? item.id;
-			return dropdown.addOptions(options).setValue(defaults.model ?? "").setDisabled(!defaults.provider).onChange(async (modelId) => {
-				const selectedModel = models.find((item) => item.id === modelId);
-				const selectedEfforts = selectedModel?.efforts ?? provider?.efforts ?? [];
-				await this.plugin.setNewConversationDefaults({
-					...this.plugin.deviceSettings.newConversationDefaults,
-					model: modelId || undefined,
-					effort: modelId && selectedEfforts.length > 0 ? "auto" : undefined,
-				});
-				this.display();
-			});
-		});
-
-		new Setting(containerEl).setName(t("label.effort")).setDesc(defaults.model ? (efforts.length ? t("settings.defaults.effortDesc") : t("settings.defaults.effortUnsupported")) : t("settings.defaults.selectModelFirst")).addDropdown((dropdown) => {
-			const options: Record<string, string> = { "": efforts.length ? t("common.unset") : t("common.unsupported") };
-			if (efforts.length) options.auto = t("composer.effortServerDefault");
-			for (const item of efforts) options[item.id] = item.label ?? item.id;
-			return dropdown.addOptions(options).setValue(defaults.effort ?? "").setDisabled(!defaults.model || efforts.length === 0).onChange(async (effort) => {
-				await this.plugin.setNewConversationDefaults({
-					...this.plugin.deviceSettings.newConversationDefaults,
-					effort: effort || undefined,
-				});
-			});
-		});
-
-		new Setting(containerEl).setName(t("label.context")).setDesc(t("settings.defaults.contextDesc")).addDropdown((dropdown) => {
-			const options: Record<string, string> = {};
-			for (const depth of CONTEXT_DEPTHS) options[depth.id] = contextDepthLabel(depth.id);
-			return dropdown.addOptions(options).setValue(defaults.contextDepth ?? "").onChange(async (depth) => {
-				await this.plugin.setNewConversationDefaults({
-					...this.plugin.deviceSettings.newConversationDefaults,
-					contextDepth: depth as ContextDepth,
-				});
-			});
-		});
+		return [
+			{
+				key: "defaults.connection",
+				name: t("label.connection"),
+				desc: t("settings.defaults.connectionDesc"),
+				options: connectionOptions,
+				value: defaults.connectionId ?? "",
+				onChange: async (connectionId) => {
+					const connection = this.plugin.connection(connectionId);
+					const next: SessionPreferences = defaults.contextDepth ? { contextDepth: defaults.contextDepth } : {};
+					if (connection) {
+						const snapshot = connectionSnapshot(connection);
+						next.connectionId = snapshot.id;
+						next.connectionName = snapshot.name;
+						next.connectionType = snapshot.type;
+						if (snapshot.detail) next.connectionDetail = snapshot.detail;
+					}
+					await this.plugin.setNewConversationDefaults(next);
+					this.rerender();
+					if (connection) {
+						void this.plugin.testConnection(connection.id).then(() => this.rerender());
+					}
+				},
+			},
+			{
+				key: "defaults.provider",
+				name: t("label.provider"),
+				desc: defaults.connectionId ? t("settings.defaults.providerDesc") : t("settings.defaults.selectConnectionFirst"),
+				options: providerOptions,
+				value: defaults.provider ?? "",
+				disabled: !defaults.connectionId,
+				onChange: async (providerId) => {
+					await this.plugin.setNewConversationDefaults({
+						...this.plugin.deviceSettings.newConversationDefaults,
+						provider: providerId || undefined,
+						model: undefined,
+						effort: undefined,
+					});
+					this.rerender();
+				},
+			},
+			{
+				key: "defaults.model",
+				name: t("label.model"),
+				desc: defaults.provider ? t("settings.defaults.modelDesc") : t("settings.defaults.selectProviderFirst"),
+				options: modelOptions,
+				value: defaults.model ?? "",
+				disabled: !defaults.provider,
+				onChange: async (modelId) => {
+					const selectedModel = models.find((item) => item.id === modelId);
+					const selectedEfforts = selectedModel?.efforts ?? provider?.efforts ?? [];
+					await this.plugin.setNewConversationDefaults({
+						...this.plugin.deviceSettings.newConversationDefaults,
+						model: modelId || undefined,
+						effort: modelId && selectedEfforts.length > 0 ? "auto" : undefined,
+					});
+					this.rerender();
+				},
+			},
+			{
+				key: "defaults.effort",
+				name: t("label.effort"),
+				desc: defaults.model ? (efforts.length ? t("settings.defaults.effortDesc") : t("settings.defaults.effortUnsupported")) : t("settings.defaults.selectModelFirst"),
+				options: effortOptions,
+				value: defaults.effort ?? "",
+				disabled: !defaults.model || efforts.length === 0,
+				onChange: async (effort) => {
+					await this.plugin.setNewConversationDefaults({
+						...this.plugin.deviceSettings.newConversationDefaults,
+						effort: effort || undefined,
+					});
+				},
+			},
+			{
+				key: "defaults.context",
+				name: t("label.context"),
+				desc: t("settings.defaults.contextDesc"),
+				options: contextOptions,
+				value: defaults.contextDepth ?? "",
+				onChange: async (depth) => {
+					await this.plugin.setNewConversationDefaults({
+						...this.plugin.deviceSettings.newConversationDefaults,
+						contextDepth: depth as ContextDepth,
+					});
+				},
+			},
+		];
 	}
 
 	/** The two full-text limits: rarely touched, so they sit folded at the end. */
 	private renderAdvanced(containerEl: HTMLElement): void {
+		for (const spec of this.advancedRows()) this.dropdownRow(containerEl, spec);
+	}
+
+	private advancedRows(): DropdownSpec[] {
 		// This bounds explicit Full execution. It used to be a
 		// fixed fifteen minutes with nothing in the UI, so a manuscript that
 		// legitimately took longer simply failed and there was nothing to adjust.
 		const deadline = this.plugin.deviceSettings.fullCorpusDeadlineMinutes;
-		new Setting(containerEl)
-			.setName(t("settings.defaults.deadlineName"))
-			.setDesc(t("settings.defaults.deadlineDesc"))
-			.addDropdown((dropdown) => {
-				const choices = [5, 15, 30, 60, 120].filter(
-					(minutes) => minutes >= MIN_FULL_CORPUS_DEADLINE_MINUTES && minutes <= MAX_FULL_CORPUS_DEADLINE_MINUTES,
-				);
-				// A value stored by another build must stay selectable, or opening
-				// Settings would silently reset it to whatever the list starts with.
-				if (!choices.includes(deadline)) choices.push(deadline);
-				const options: Record<string, string> = {};
-				for (const minutes of choices.sort((a, b) => a - b)) options[String(minutes)] = t("settings.defaults.minutes", { minutes });
-				return dropdown
-					.addOptions(options)
-					.setValue(String(deadline))
-					.onChange(async (value) => {
-						await this.plugin.setFullCorpusDeadlineMinutes(Number(value));
-					});
-			});
+		const choices = [5, 15, 30, 60, 120].filter(
+			(minutes) => minutes >= MIN_FULL_CORPUS_DEADLINE_MINUTES && minutes <= MAX_FULL_CORPUS_DEADLINE_MINUTES,
+		);
+		// A value stored by another build must stay selectable, or opening
+		// Settings would silently reset it to whatever the list starts with.
+		if (!choices.includes(deadline)) choices.push(deadline);
+		const deadlineOptions: Record<string, string> = {};
+		for (const minutes of choices.sort((a, b) => a - b)) deadlineOptions[String(minutes)] = t("settings.defaults.minutes", { minutes });
+		const concurrencyOptions: Record<string, string> = {};
+		for (let n = MIN_FULL_CORPUS_CONCURRENCY; n <= MAX_FULL_CORPUS_CONCURRENCY; n += 1) concurrencyOptions[String(n)] = String(n);
 
-		new Setting(containerEl)
-			.setName(t("settings.defaults.concurrencyName"))
-			.setDesc(t("settings.defaults.concurrencyDesc"))
-			.addDropdown((dropdown) => {
-				const options: Record<string, string> = {};
-				for (let n = MIN_FULL_CORPUS_CONCURRENCY; n <= MAX_FULL_CORPUS_CONCURRENCY; n += 1) options[String(n)] = String(n);
-				return dropdown
-					.addOptions(options)
-					.setValue(String(this.plugin.deviceSettings.fullCorpusConcurrency))
-					.onChange(async (value) => {
-						await this.plugin.setFullCorpusConcurrency(Number(value));
-					});
-			});
+		return [
+			{
+				key: "fullCorpusDeadlineMinutes",
+				name: t("settings.defaults.deadlineName"),
+				desc: t("settings.defaults.deadlineDesc"),
+				options: deadlineOptions,
+				value: String(deadline),
+				onChange: (value) => this.plugin.setFullCorpusDeadlineMinutes(Number(value)),
+			},
+			{
+				key: "fullCorpusConcurrency",
+				name: t("settings.defaults.concurrencyName"),
+				desc: t("settings.defaults.concurrencyDesc"),
+				options: concurrencyOptions,
+				value: String(this.plugin.deviceSettings.fullCorpusConcurrency),
+				onChange: (value) => this.plugin.setFullCorpusConcurrency(Number(value)),
+			},
+		];
 	}
 
 	private renderInstructionsAndSkills(containerEl: HTMLElement): void {
@@ -408,14 +606,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 			descriptors.filter((descriptor) => descriptor.ownership === "custom"),
 		);
 
-		new Setting(containerEl)
-			.setName(t("settings.skills.create"))
-			.setDesc(t("settings.skills.createDesc"))
-			.addButton((button) => button
-				.setButtonText(t("settings.skills.createButton"))
-				.setCta()
-				.setTooltip(t("settings.skills.createTooltip"))
-				.onClick(() => this.openCustomSkillEditor()));
+		this.createSkillRow(new Setting(containerEl).setName(t("settings.skills.create")).setDesc(t("settings.skills.createDesc")));
 
 		const problems = this.plugin.skillLoadProblems();
 		if (problems.length > 0) {
@@ -431,20 +622,24 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 	}
 
 	private renderProjectInstructions(containerEl: HTMLElement): void {
-		const epoch = this.displayEpoch;
-		const host = containerEl.createDiv({ cls: "wb-project-instructions" });
-		new Setting(host)
+		this.projectInstructionsRow(new Setting(containerEl));
+	}
+
+	/**
+	 * The project-instructions row. It renders as "checking" and fills itself
+	 * in once the file has been read; a row torn down before that is simply a
+	 * detached element receiving the answer.
+	 */
+	private projectInstructionsRow(setting: Setting): void {
+		setting
+			.setClass("wb-project-instructions-row")
 			.setName(t("settings.instructions.name"))
 			.setDesc(t("settings.instructions.checking", { path: PROJECT_INSTRUCTIONS_PATH }));
 
 		void this.plugin.projectInstructions.load().then((state) => {
-			if (epoch !== this.displayEpoch) return;
-			host.empty();
-			this.renderProjectInstructionsState(host, state);
+			this.renderProjectInstructionsState(setting, state);
 		}).catch(() => {
-			if (epoch !== this.displayEpoch) return;
-			host.empty();
-			this.renderProjectInstructionsState(host, {
+			this.renderProjectInstructionsState(setting, {
 				status: "invalid",
 				text: "",
 				error: "Could not load project instructions.",
@@ -453,16 +648,13 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		});
 	}
 
-	private renderProjectInstructionsState(
-		containerEl: HTMLElement,
-		state: ProjectInstructionsState,
-	): void {
+	private renderProjectInstructionsState(row: Setting, state: ProjectInstructionsState): void {
 		const presentation = projectInstructionsPresentation(state);
-		const row = new Setting(containerEl)
-			.setClass("wb-project-instructions-row")
+		row
 			.setClass(presentation.statusClass)
 			.setName(t("settings.instructions.name"))
 			.setDesc(t("settings.instructions.stateDesc", { status: presentation.statusLabel, path: state.path }));
+		row.controlEl.empty();
 
 		if (presentation.canView) {
 			row.addButton((button) => button
@@ -479,15 +671,14 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				onSave: (source) => this.plugin.projectInstructions.save(source),
 				onSaved: () => {
 					this.plugin.refreshViews();
-					this.display();
+					this.rerender();
 					new Notice(t("settings.instructions.saved"));
 				},
 			}).open()));
 
 		if (presentation.canClear) {
-			row.addButton((button) => button
-				.setButtonText(t("settings.instructions.clear"))
-				.setWarning()
+			row.addButton((button) => markDestructive(button
+				.setButtonText(t("settings.instructions.clear")))
 				.onClick(() => void this.clearProjectInstructions()));
 		}
 	}
@@ -509,10 +700,10 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				return;
 			}
 			this.plugin.refreshViews();
-			this.display();
+			this.rerender();
 			new Notice(t("settings.instructions.cleared"));
 		} catch {
-			new Notice("无法清除项目指令，请检查 Vault 是否可写后重试。");
+			new Notice(t("settings.instructions.clearFailed"));
 		}
 	}
 
@@ -532,45 +723,73 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		this.renderCollapsibleHeading(group, "skills:" + groupKey, `${label} · ${descriptors.length}`, list, groupKey !== "builtin");
 		group.insertBefore(group.lastElementChild!, list);
 
-		for (const descriptor of descriptors) {
-			const skill = descriptor.skill;
-			const version = descriptor.builtinVersion ?? skill.version;
-			const customized = descriptor.ownership === "customized-builtin" || descriptor.customized;
-			const ownership = descriptor.ownership === "custom"
-				? t("settings.skills.ownedByUser")
-				: customized ? t("settings.skills.builtinMetaCustomized", { version }) : t("settings.skills.builtinMeta", { version });
-			const review = descriptor.status === "needs-review" ? t("settings.skills.needsReview") : "";
-			const setting = new Setting(list)
-				.setClass("wb-skill-row")
-				.setName(skill.name)
-				.setDesc(`${ownership}${review}${skill.description ? ` · ${skill.description}` : ""}`);
-			if (descriptor.status && descriptor.status !== "active") setting.setClass("is-attention");
+		for (const descriptor of descriptors) this.skillRow(new Setting(list), descriptor);
+	}
 
-			if (descriptor.ownership === "custom") {
-				setting.addButton((button) => button
-					.setButtonText(t("common.edit"))
-					.onClick(() => this.openCustomSkillEditor(descriptor)));
-				continue;
-			}
+	private skillRowDescription(descriptor: SkillDescriptor): string {
+		const skill = descriptor.skill;
+		const version = descriptor.builtinVersion ?? skill.version;
+		const customized = descriptor.ownership === "customized-builtin" || descriptor.customized;
+		const ownership = descriptor.ownership === "custom"
+			? t("settings.skills.ownedByUser")
+			: customized ? t("settings.skills.builtinMetaCustomized", { version }) : t("settings.skills.builtinMeta", { version });
+		const review = descriptor.status === "needs-review" ? t("settings.skills.needsReview") : "";
+		return `${ownership}${review}${skill.description ? ` · ${skill.description}` : ""}`;
+	}
 
-			setting.addButton((button) => button.setButtonText(t("settings.skills.viewBuiltin")).onClick(() => {
-				const builtin = this.builtinSkill(skill.id);
-				if (!builtin) { new Notice(t("settings.skills.cantReadBuiltin")); return; }
-				new BuiltinSkillModal(this.app, {
-					mode: "view",
-					skill: builtin,
-					routingProbe: (message) => this.probeRouting(message),
-				}).open();
-			}));
+	/** One skill: who owns it, then View / Customize / Reset, or Edit for the writer's own. */
+	private skillRow(setting: Setting, descriptor: SkillDescriptor): void {
+		const skill = descriptor.skill;
+		const customized = descriptor.ownership === "customized-builtin" || descriptor.customized;
+		setting
+			.setClass("wb-skill-row")
+			.setName(skill.name)
+			.setDesc(this.skillRowDescription(descriptor));
+		if (descriptor.status && descriptor.status !== "active") setting.setClass("is-attention");
+
+		if (descriptor.ownership === "custom") {
 			setting.addButton((button) => button
-				.setButtonText(t("settings.skills.editCustomization"))
-				.onClick(() => void this.openBuiltinCustomization(skill.id)));
+				.setButtonText(t("common.edit"))
+				.onClick(() => this.openCustomSkillEditor(descriptor)));
+			return;
+		}
 
-			setting.addButton((button) => button
-				.setButtonText(t("settings.skills.resetCustomization"))
-				.setDisabled(!customized)
-				.setTooltip(customized ? t("settings.skills.resetTooltip") : t("settings.skills.noCustomization"))
-				.onClick(() => void this.resetBuiltinCustomization(skill)));
+		setting.addButton((button) => button.setButtonText(t("settings.skills.viewBuiltin")).onClick(() => {
+			const builtin = this.builtinSkill(skill.id);
+			if (!builtin) { new Notice(t("settings.skills.cantReadBuiltin")); return; }
+			new BuiltinSkillModal(this.app, {
+				mode: "view",
+				skill: builtin,
+				routingProbe: (message) => this.probeRouting(message),
+			}).open();
+		}));
+		setting.addButton((button) => button
+			.setButtonText(t("settings.skills.editCustomization"))
+			.onClick(() => void this.openBuiltinCustomization(skill.id)));
+
+		setting.addButton((button) => button
+			.setButtonText(t("settings.skills.resetCustomization"))
+			.setDisabled(!customized)
+			.setTooltip(customized ? t("settings.skills.resetTooltip") : t("settings.skills.noCustomization"))
+			.onClick(() => void this.resetBuiltinCustomization(skill)));
+	}
+
+	private createSkillRow(setting: Setting): void {
+		setting.addButton((button) => button
+			.setButtonText(t("settings.skills.createButton"))
+			.setCta()
+			.setTooltip(t("settings.skills.createTooltip"))
+			.onClick(() => this.openCustomSkillEditor()));
+	}
+
+	/** Skill files that could not be loaded, one line each, under a count. */
+	private skillProblemsRow(setting: Setting): void {
+		const problems = this.plugin.skillLoadProblems();
+		setting.setClass("wb-skill-problems").setName(t("settings.skills.problemsTitle", { count: problems.length }));
+		setting.settingEl.setAttribute("role", "status");
+		setting.descEl.empty();
+		for (const problem of problems) {
+			setting.descEl.createDiv({ text: `${basename(problem.path)} · ${skillProblemDescription(problem.reason)}` });
 		}
 	}
 
@@ -624,7 +843,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 					} else {
 						await this.plugin.saveBuiltinSkillCustomization(id, extension);
 					}
-					this.display();
+					this.rerender();
 				},
 			}).open();
 		} catch {
@@ -641,7 +860,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		if (!confirmed) return;
 		try {
 			await this.plugin.resetBuiltinSkillCustomization(skill.id);
-			this.display();
+			this.rerender();
 			new Notice(t("settings.skills.resetDone", { name: skill.name }));
 		} catch {
 			new Notice(t("settings.skills.resetFailed"));
@@ -655,18 +874,24 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 			reservedIds: this.plugin.skillDescriptors().map((item) => item.id),
 			onSave: async (source, existingPath) => {
 				await this.plugin.saveCustomSkill(source, existingPath);
-				this.display();
+				this.rerender();
 			},
 		}).open();
 	}
 
 	private renderProjectData(containerEl: HTMLElement): void {
 		const status = containerEl.createDiv({ cls: "wb-settings-status" });
+		this.sessionsRow(new Setting(containerEl), status);
+		this.storageRow(new Setting(containerEl), status);
+	}
+
+	/** How many conversations there are, and a way to drop the archived ones. */
+	private sessionsRow(setting: Setting, status: HTMLElement | null): void {
 		const sessions = this.plugin.sessions;
 		const archived = sessions.archivedSessions();
 		const limitReached = sessions.count >= SESSION_RECOMMENDED_LIMIT;
 
-		new Setting(containerEl)
+		setting
 			.setName(t("settings.sessions.name"))
 			.setDesc(
 				t("settings.sessions.desc", { count: sessions.count, limit: SESSION_RECOMMENDED_LIMIT, archived: archived.length }) +
@@ -693,13 +918,11 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 					this.plugin.conversationChanged();
 					this.plugin.rememberActiveSession();
 					this.plugin.refreshViews();
-					status.setText(t("settings.sessions.deleted", { count: deleted }));
+					status?.setText(t("settings.sessions.deleted", { count: deleted }));
 					new Notice(t("settings.sessions.deleted", { count: deleted }));
-					this.display();
+					this.rerender();
 				});
 			});
-
-		this.renderStorageUsage(containerEl, status);
 	}
 
 	/**
@@ -711,8 +934,8 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 	 * question with no other answer in the app. Measuring is asynchronous and
 	 * the row renders before it finishes; the description fills itself in.
 	 */
-	private renderStorageUsage(containerEl: HTMLElement, status: HTMLElement): void {
-		const row = new Setting(containerEl).setName(t("settings.storage.name"));
+	private storageRow(row: Setting, status: HTMLElement | null): void {
+		row.setName(t("settings.storage.name"));
 		row.setDesc("…");
 		void (async () => {
 			const usage = await this.plugin.projectStore.storageUsage();
@@ -722,6 +945,9 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				localFiles: usage.local.files,
 				localSize: formatBytes(usage.local.bytes),
 			}));
+			// Obsidian 1.13 keeps the row across re-renders, so a measurement
+			// that started before the last one must not add a second button.
+			row.controlEl.empty();
 			row.addButton((button) => {
 				button.setButtonText(t("settings.storage.clear"));
 				button.setDisabled(usage.local.files === 0);
@@ -737,9 +963,9 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 					}).openAndConfirm();
 					if (!confirmed) return;
 					const { removed } = await this.plugin.projectStore.clearLocalCache();
-					status.setText(t("settings.storage.cleared", { count: removed }));
+					status?.setText(t("settings.storage.cleared", { count: removed }));
 					new Notice(t("settings.storage.cleared", { count: removed }));
-					this.display();
+					this.rerender();
 				});
 			});
 		})();

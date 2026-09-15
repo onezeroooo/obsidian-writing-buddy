@@ -15,6 +15,7 @@
  * The test suite asserts against the Chinese source strings and pins the
  * locale in its setup file; nothing in the product relies on that.
  */
+import { getLanguage } from "obsidian";
 import { en } from "./en";
 import { zh } from "./zh";
 
@@ -63,8 +64,7 @@ export function resolveInstructionLocale(setting: LocaleSetting | undefined): Lo
 /** The locale Obsidian's own UI is using. Anything unreadable or unknown is English. */
 export function detectObsidianLocale(): Locale {
 	try {
-		const language = window.localStorage.getItem("language");
-		return language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+		return getLanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
 	} catch {
 		return "en";
 	}

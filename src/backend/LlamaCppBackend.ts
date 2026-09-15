@@ -13,6 +13,7 @@ import { fetchHttpClient, type HttpClient, type HttpRequest, type HttpResponse }
 import { unsafeVaultPathMessage } from "./safePath";
 import { redactCredential } from "../auth/redact";
 import { t } from "../i18n";
+import { asError } from "../util/errors";
 
 export const LOCAL_OPENAI_REQUEST_TIMEOUT_MS = 120_000;
 export const DEFAULT_LOCAL_OPENAI_MODEL = "gemma4-12b-writing";
@@ -398,16 +399,16 @@ function isLoopbackHost(hostname: string): boolean {
 function settleWithTimeout<T>(promise: Promise<T>, controller: AbortController, timeoutMs: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		let settled = false;
-		let timer: ReturnType<typeof setTimeout> | undefined;
+		let timer: number | undefined;
 		const finish = (callback: () => void): void => {
 			if (settled) return;
 			settled = true;
-			if (timer !== undefined) clearTimeout(timer);
+			if (timer !== undefined) window.clearTimeout(timer);
 			controller.signal.removeEventListener("abort", onAbort);
 			callback();
 		};
 		const onAbort = (): void => finish(() => reject(abortError()));
-		timer = setTimeout(() => {
+		timer = window.setTimeout(() => {
 			if (settled) return;
 			settled = true;
 			controller.signal.removeEventListener("abort", onAbort);
@@ -418,7 +419,7 @@ function settleWithTimeout<T>(promise: Promise<T>, controller: AbortController, 
 		if (controller.signal.aborted) onAbort();
 		promise.then(
 			(value) => finish(() => resolve(value)),
-			(error: unknown) => finish(() => reject(error)),
+			(error: unknown) => finish(() => reject(asError(error))),
 		);
 	});
 }

@@ -579,7 +579,7 @@ function parseContextSources(raw: unknown): NonNullable<ContextBuildReport["sour
 		if (hasRevisionFields && !orderedRange) return [];
 		const location: Pick<ContextSourceSnapshot, "from" | "to" | "revision" | "revisionKind"> = hasRevisionFields
 			? { from: from!, to: to!, revision: revision!, revisionKind: revisionKind! }
-			: (orderedRange ? { from: from!, to: to! } : {});
+			: (orderedRange ? { from, to } : {});
 		return [{
 			path, label, type, truncated: record.truncated === true,
 			...(str(record.heading) ? { heading: str(record.heading) } : {}),
@@ -615,6 +615,7 @@ function isSourceRevision(value: string | undefined): value is ContextBuildRepor
  */
 function isSafeVaultRelativePath(value: unknown): value is string {
 	if (typeof value !== "string" || value.length === 0 || value.trim().length === 0) return false;
+	// eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
 	if (/[\\\u0000-\u001f\u007f-\u009f]/.test(value)) return false;
 	if (value.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value)) return false;
 	const segments = value.split("/");

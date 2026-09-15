@@ -262,7 +262,7 @@ export function isSemanticResearchQuery(value: string, maxChars = DEFAULT_MAX_QU
 	if (/(?:^|\s)\.{1,2}(?:\s|$)/u.test(text)) return false;
 	if (/[*]/u.test(text)) return false;
 	if (/\S\?\S/u.test(text)) return false;
-	if (/!?\[[^\]\n]+\]\([^\)\n]+\)/u.test(text)) return false;
+	if (/!?\[[^\]\n]+\]\([^)\n]+\)/u.test(text)) return false;
 	if (/\b[^\s]+\.(?:md|txt|json|ya?ml|canvas)\b/iu.test(text)) return false;
 	return true;
 }
@@ -311,14 +311,14 @@ export function researchPlannerPrompt(options: PlannerPromptOptions): string {
 		] : []),
 		say("回复中必须恰好包含一个由下列标记包裹的 JSON 对象。允许的形状：", "The reply must contain exactly one JSON object wrapped in the markers below. Allowed shapes:"),
 		...(searchAvailable ? [
-			`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"search\",\"query\":\"${say("自然语言描述的概念或事实", "a concept or fact described in natural language")}\"}${RESEARCH_PLAN_END_SENTINEL}`,
+			`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"search","query":"${say("自然语言描述的概念或事实", "a concept or fact described in natural language")}"}${RESEARCH_PLAN_END_SENTINEL}`,
 		] : []),
-		`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"read\",\"handles\":[\"R1\",\"R3\"]}${RESEARCH_PLAN_END_SENTINEL}`,
-		`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"readAround\",\"handle\":\"S1\",\"before\":1200,\"after\":1200}${RESEARCH_PLAN_END_SENTINEL}`,
+		`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"read","handles":["R1","R3"]}${RESEARCH_PLAN_END_SENTINEL}`,
+		`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"readAround","handle":"S1","before":1200,"after":1200}${RESEARCH_PLAN_END_SENTINEL}`,
 		...(options.allowCompleteCorpus ? [
-			`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"completeCorpus\"}${RESEARCH_PLAN_END_SENTINEL}`,
+			`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"completeCorpus"}${RESEARCH_PLAN_END_SENTINEL}`,
 		] : []),
-		`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"synthesize\"}${RESEARCH_PLAN_END_SENTINEL}`,
+		`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"synthesize"}${RESEARCH_PLAN_END_SENTINEL}`,
 		say("标记必须原样写出，成对且只出现一次；标记之间只放 JSON，不要加代码围栏。", "Write the markers exactly as shown, as one pair and only once; put nothing but the JSON between them, and no code fences."),
 		...(searchAvailable
 			? [say("搜索时使用语义化的说法。作者提到的章节名、人物名、地点名本身就是有效的搜索词。", "Phrase searches semantically. Chapter names, character names and place names the writer mentions are valid search terms on their own.")]
@@ -465,12 +465,12 @@ export function researchDecisionPrompt(options: DecisionPromptOptions): string {
 		say("这是有限研究，不是全库扫描；不要声称覆盖了全部项目内容。不要提及研究动作、观察结果或本协议。", "This is bounded research, not a scan of the whole Vault; never claim to have covered the entire project. Do not mention research actions, observations or this protocol."),
 		say("（二）需要检索项目资料时，输出且仅输出一个动作，格式如下：", "(2) When project material must be retrieved, output one action and nothing else, in this format:"),
 		...(searchAvailable ? [
-			`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"search\",\"query\":\"${say("自然语言描述的概念或事实", "a concept or fact described in natural language")}\"}${RESEARCH_PLAN_END_SENTINEL}`,
+			`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"search","query":"${say("自然语言描述的概念或事实", "a concept or fact described in natural language")}"}${RESEARCH_PLAN_END_SENTINEL}`,
 		] : []),
-		`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"read\",\"handles\":[\"R1\",\"R3\"]}${RESEARCH_PLAN_END_SENTINEL}`,
-		`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"readAround\",\"handle\":\"S1\",\"before\":1200,\"after\":1200}${RESEARCH_PLAN_END_SENTINEL}`,
+		`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"read","handles":["R1","R3"]}${RESEARCH_PLAN_END_SENTINEL}`,
+		`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"readAround","handle":"S1","before":1200,"after":1200}${RESEARCH_PLAN_END_SENTINEL}`,
 		...(options.allowCompleteCorpus ? [
-			`${RESEARCH_PLAN_SENTINEL}{\"version\":1,\"action\":\"completeCorpus\"}${RESEARCH_PLAN_END_SENTINEL}`,
+			`${RESEARCH_PLAN_SENTINEL}{"version":1,"action":"completeCorpus"}${RESEARCH_PLAN_END_SENTINEL}`,
 			say("只有同时满足这两点才选 completeCorpus（Full）：作者要求答案本身对全部符合条件的稿件做出穷尽性断言，且一个明确说明自身局限的有限答案无法满足该要求。", "Choose completeCorpus (Full) only when both hold: the writer asks for an answer that itself makes an exhaustive claim about all eligible manuscript, and a bounded answer that states its own limits would not satisfy that request."),
 			say("仅仅是不确定并不构成理由。按整体语义理解请求，不要靠词面匹配；被引用、假设、否定或明确排除的穷尽性措辞并不要求 Full。", "Uncertainty alone is not a reason. Read the request as a whole, not by keyword; exhaustive wording that is quoted, hypothetical, negated or explicitly excluded does not call for Full."),
 			say("它是移交给宿主完整覆盖流程的终结动作，不是一次范围更大的搜索。", "It is a terminal hand-off to the host's full-coverage workflow, not a bigger search."),

@@ -67,8 +67,8 @@ export class SelectionBridgeCoordinator<T> {
 	private conversationEpoch = 0;
 	private selectionEpoch = 0;
 	private pending: PendingSelection<T> | null = null;
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-	private suppressionTimer: ReturnType<typeof setTimeout> | null = null;
+	private debounceTimer: number | null = null;
+	private suppressionTimer: number | null = null;
 	private programmaticDepth = 0;
 	private ignoredSelection: T | null | undefined;
 	private writeChain: Promise<void> = Promise.resolve();
@@ -100,7 +100,7 @@ export class SelectionBridgeCoordinator<T> {
 		this.cancelPending();
 		this.selectionEpoch += 1;
 		this.pending = { target: this.bindActiveSession(), selection };
-		this.debounceTimer = setTimeout(() => {
+		this.debounceTimer = window.setTimeout(() => {
 			this.debounceTimer = null;
 			const pending = this.pending;
 			this.pending = null;
@@ -209,7 +209,7 @@ export class SelectionBridgeCoordinator<T> {
 	 * apply because the pending observation goes through the normal queue.
 	 */
 	flushPending(): Promise<void> {
-		if (this.debounceTimer !== null) clearTimeout(this.debounceTimer);
+		if (this.debounceTimer !== null) window.clearTimeout(this.debounceTimer);
 		this.debounceTimer = null;
 		const pending = this.pending;
 		this.pending = null;
@@ -252,7 +252,7 @@ export class SelectionBridgeCoordinator<T> {
 			if (target.selectionEpoch !== this.selectionEpoch) return;
 			if (target.activeAtStart && this.port.activeSessionId() !== target.activeAtStart) return;
 			const current = this.port.currentSelection(sessionId);
-			if (!force && sameNullable(current, selection, this.port.equals)) return;
+			if (!force && sameNullable(current, selection, (a, b) => this.port.equals(a, b))) return;
 			await this.port.writeSelection(sessionId, selection);
 			// The write may have been overtaken while awaiting persistence. Never
 			// publish its stale result; the newer queued authority will reconcile it.
@@ -267,7 +267,7 @@ export class SelectionBridgeCoordinator<T> {
 	}
 
 	private cancelPending(): void {
-		if (this.debounceTimer !== null) clearTimeout(this.debounceTimer);
+		if (this.debounceTimer !== null) window.clearTimeout(this.debounceTimer);
 		this.debounceTimer = null;
 		this.pending = null;
 	}
@@ -275,7 +275,7 @@ export class SelectionBridgeCoordinator<T> {
 	private armPostProgrammaticSuppression(selection: T): void {
 		this.clearSuppression();
 		this.ignoredSelection = selection;
-		this.suppressionTimer = setTimeout(() => this.clearSuppression(), this.debounceMs);
+		this.suppressionTimer = window.setTimeout(() => this.clearSuppression(), this.debounceMs);
 	}
 
 	private cancelProgrammaticTargets(): void {
@@ -285,7 +285,7 @@ export class SelectionBridgeCoordinator<T> {
 	}
 
 	private clearSuppression(): void {
-		if (this.suppressionTimer !== null) clearTimeout(this.suppressionTimer);
+		if (this.suppressionTimer !== null) window.clearTimeout(this.suppressionTimer);
 		this.suppressionTimer = null;
 		this.ignoredSelection = undefined;
 	}

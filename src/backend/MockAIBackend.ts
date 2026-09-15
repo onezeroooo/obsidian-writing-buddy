@@ -216,7 +216,7 @@ export class MockAIBackend implements AIBackend {
 
 	private pause(): Promise<void> {
 		if (this.chunkDelayMs <= 0) return Promise.resolve();
-		return new Promise((resolve) => setTimeout(resolve, this.chunkDelayMs));
+		return new Promise((resolve) => window.setTimeout(resolve, this.chunkDelayMs));
 	}
 }
 

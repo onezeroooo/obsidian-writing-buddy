@@ -113,7 +113,7 @@ export class MemoryDeviceStorage implements DeviceStorage {
 /** Resolve the best available device storage for the current host. */
 export function resolveDeviceStorage(): DeviceStorage {
 	try {
-		const candidate = (globalThis as { localStorage?: DeviceStorage }).localStorage;
+		const candidate = (window as { localStorage?: DeviceStorage }).localStorage;
 		if (candidate) {
 			// Probe it: a disabled or full localStorage throws on write.
 			const probe = `${KEY_PREFIX}probe`;

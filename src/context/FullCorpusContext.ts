@@ -238,7 +238,7 @@ export async function buildFullCorpusSnapshot(
 		try {
 			const useEditor = path === activeFilePath && liveText !== null;
 			const revision = useEditor ? "editor" as const : "saved" as const;
-			const text = useEditor ? liveText as string : await reader.read(path);
+			const text = useEditor ? liveText : await reader.read(path);
 			throwIfSnapshotCancelled(options);
 			if (hasExplicitArchiveMetadata(text)) {
 				excludedFiles.push(path);
@@ -389,7 +389,7 @@ export function parseFullCorpusReport(value: unknown): FullCorpusCoverage | unde
 	if (!Array.isArray(record.uncoveredFiles) || !record.uncoveredFiles.every(isSafeVaultRelativePath)) {
 		return undefined;
 	}
-	const uncoveredFiles = record.uncoveredFiles as string[];
+	const uncoveredFiles = record.uncoveredFiles;
 	let completedBatchIndexes: number[] | undefined;
 	if (record.completedBatchIndexes !== undefined) {
 		if (!Array.isArray(record.completedBatchIndexes) ||
@@ -454,7 +454,7 @@ export function parseFullCorpusReport(value: unknown): FullCorpusCoverage | unde
 		totalBatches: numbers.totalBatches,
 		reductionBatches: numbers.reductionBatches,
 		...(typeof record.totalReductionBatches === "number" ? { totalReductionBatches: record.totalReductionBatches } : {}),
-		...(typeof record.summaryStatus === "string" ? { summaryStatus: record.summaryStatus as NonNullable<FullCorpusCoverage["summaryStatus"]> } : {}),
+		...(typeof record.summaryStatus === "string" ? { summaryStatus: record.summaryStatus } : {}),
 		readFailures: numbers.readFailures,
 		uncoveredFiles: [...uncoveredFiles],
 		...(typeof record.backendCalls === "number" ? { backendCalls: record.backendCalls } : {}),
@@ -568,6 +568,7 @@ function chineseInteger(value: string): number | null {
 
 function isSafeVaultRelativePath(value: unknown): value is string {
 	if (typeof value !== "string" || value.length === 0 || value.trim() !== value) return false;
+	// eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
 	if (/[\\\u0000-\u001f\u007f-\u009f]/u.test(value) || value.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return false;
 	return value.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }

@@ -230,7 +230,7 @@ export function sanitizeGeneratedTitle(raw: string): string | null {
 	const stripped = firstLine
 		.trim()
 		.replace(/^(标题|title)\s*[:：]\s*/i, "")
-		.replace(/^[「『“"'‘《【\[]+/u, "")
+		.replace(/^[「『“"'‘《【[]+/u, "")
 		.replace(/[」』”"'’》】\]]+$/u, "")
 		.replace(/[。.!！?？，,、；;]+$/u, "")
 		.trim();

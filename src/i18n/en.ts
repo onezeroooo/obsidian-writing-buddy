@@ -72,6 +72,7 @@ export const en: Record<keyof typeof zh, string> = {
 	"skillModal.fieldId": "Skill ID",
 	"skillModal.idKeep": "An existing skill's ID stays unchanged.",
 	"skillModal.idFormat": "Use letters, digits, hyphens, or underscores.",
+	"skillModal.idPlaceholder": "scene-tension",
 	"skillModal.fieldName": "Name",
 	"skillModal.namePlaceholder": "Scene tension check",
 	"skillModal.descriptionDesc": "Optional; helps identify the skill in the list.",

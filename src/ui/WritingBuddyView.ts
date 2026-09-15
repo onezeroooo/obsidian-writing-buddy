@@ -953,7 +953,7 @@ export class WritingBuddyView extends ItemView {
 
 	/** An explicit attach action replaces the previous referent directly. */
 	async attachSelectionFromEditor(editor: Editor, filePath: string): Promise<void> {
-		const attachment = captureSelection(editor as unknown as Parameters<typeof captureSelection>[0], filePath);
+		const attachment = captureSelection(editor, filePath);
 		if (!attachment) {
 			new Notice(t("view.noSelection"));
 			return;
@@ -1112,7 +1112,7 @@ export class WritingBuddyView extends ItemView {
 		if (session.selection) {
 			const resolved = this.plugin.resolveEditorForPath(session.selection.filePath);
 			const reconciled = reconcileSelectionAttachment(
-				resolved ? (resolved.editor as unknown as Parameters<typeof reconcileSelectionAttachment>[0]) : null,
+				resolved ? resolved.editor : null,
 				session.selection,
 				resolved?.filePath ?? null,
 			);
@@ -1496,8 +1496,8 @@ export class WritingBuddyView extends ItemView {
 				context,
 				instruction: turn.question,
 				messages: turn.history.messages,
-				selection: turn.selection!,
-				core: rewritableCore(turn.selection!),
+				selection: turn.selection,
+				core: rewritableCore(turn.selection),
 				evidence,
 				...(turn.skill ? { skill: turn.skill } : {}),
 				instructionPayload: turn.instructionPayload,
@@ -1507,7 +1507,7 @@ export class WritingBuddyView extends ItemView {
 				if (!result.cancelled) failure = { error: result.error, metadata: result.metadata };
 			} else {
 				facts = result.facts;
-				const noChange = !isContinuation(turn.skill) && result.replacement === rewritableCore(turn.selection!);
+				const noChange = !isContinuation(turn.skill) && result.replacement === rewritableCore(turn.selection);
 				// Anything the model said outside the passage is the answer half of
 				// this turn. `presentMessage` already renders it above the candidate;
 				// it had nothing to render because nothing used to survive this far.
@@ -1520,7 +1520,7 @@ export class WritingBuddyView extends ItemView {
 					metadata: result.metadata,
 					...(turn.skill ? { skillId: turn.skill.id } : {}),
 					...(!noChange ? { candidate: { replacement: result.replacement, kind: isContinuation(turn.skill) ? "continue" as const : "replace" as const } } : {}),
-					selection: turn.selection!,
+					selection: turn.selection,
 				};
 			}
 		} else {
@@ -2358,7 +2358,7 @@ export class WritingBuddyView extends ItemView {
 		const resolved = path ? this.plugin.resolveEditorForPath(path) : null;
 		if (resolved && path) {
 			const attachment = captureSelection(
-				resolved.editor as unknown as Parameters<typeof captureSelection>[0],
+				resolved.editor,
 				path,
 			);
 			if (attachment) {

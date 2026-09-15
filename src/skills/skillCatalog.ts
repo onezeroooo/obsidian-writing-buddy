@@ -143,7 +143,7 @@ interface HistoricalSemantics {
 }
 
 function parseHistoricalSkill(source: string, fallbackId: string): HistoricalSemantics | undefined {
-	const text = source.replace(/^﻿/u, "");
+	const text = source.replace(/^\uFEFF/u, "");
 	const match = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/u.exec(text);
 	if (!match) return undefined;
 	const fields = new Map<string, string>();

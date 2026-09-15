@@ -22,19 +22,31 @@ export interface ContextEligibilityOptions {
 }
 
 const MEMORY_PREFIX = `${MEMORY_DIR}/`;
-const INTERNAL_ROOTS = [PROJECT_ROOT, CACHE_DIR, "_WritingBuddy", ".writing-buddy", ".obsidian"] as const;
+const INTERNAL_ROOTS = [PROJECT_ROOT, CACHE_DIR, "_WritingBuddy", ".writing-buddy"] as const;
 
-/** True for plugin-owned state. Bounded retrieval admits only curated memory. */
+/**
+ * Obsidian's own configuration folder, which the user can rename. The plugin
+ * reports it from `Vault#configDir` at load; until then only plugin-owned
+ * roots are internal.
+ */
+let vaultConfigDir: string | null = null;
+
+export function setVaultConfigDir(dir: string | null): void {
+	vaultConfigDir = dir ? normaliseVaultPath(dir) : null;
+}
+
+/** True for plugin-owned state and Obsidian's own configuration. Bounded retrieval admits only curated memory. */
 export function isInternalContextPath(path: string): boolean {
 	const normalised = normaliseVaultPath(path);
-	return INTERNAL_ROOTS.some((root) => normalised === root || normalised.startsWith(`${root}/`));
+	const roots: readonly string[] = vaultConfigDir ? [...INTERNAL_ROOTS, vaultConfigDir] : INTERNAL_ROOTS;
+	return roots.some((root) => normalised === root || normalised.startsWith(`${root}/`));
 }
 
 /** Explicit history/discard markers. Plain `草稿` / `draft` remain current work. */
 export function isExplicitArchivePath(path: string): boolean {
 	return normaliseVaultPath(path).split("/").some((segment) =>
 		/(?:旧稿|旧版|修改稿|弃稿|废稿|作废|存档|归档|历史版本|备份|冲突副本)/iu.test(segment) ||
-		/(?:^|[\s._\-])(archives?|archived|discarded|deprecated|backup|backups|old[\s._\-]*(?:drafts?|versions?)|conflicted?[\s._\-]*cop(?:y|ies))(?:$|[\s._\-])/iu.test(segment),
+		/(?:^|[\s._-])(archives?|archived|discarded|deprecated|backup|backups|old[\s._-]*(?:drafts?|versions?)|conflicted?[\s._-]*cop(?:y|ies))(?:$|[\s._-])/iu.test(segment),
 	);
 }
 
@@ -64,6 +76,7 @@ export function hasExplicitArchiveMetadata(text: string): boolean {
  * lags, and candidate-level duplicate suppression is a separate concern.
  */
 export function isEligibleContextPath(path: string, options: ContextEligibilityOptions = {}): boolean {
+	// eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
 	if (/[\\\u0000-\u001f\u007f-\u009f]/u.test(path) || path.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(path)) return false;
 	const normalised = normaliseVaultPath(path);
 	if (!isSafeVaultRelativePath(normalised) || !/\.md$/iu.test(normalised)) return false;
@@ -98,6 +111,7 @@ function hasArchiveTag(value: string): boolean {
 
 function isSafeVaultRelativePath(value: string): boolean {
 	if (value.length === 0 || value.trim() !== value) return false;
+	// eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
 	if (/[\u0000-\u001f\u007f-\u009f]/u.test(value) || value.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return false;
 	return value.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }

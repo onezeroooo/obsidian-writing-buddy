@@ -21,6 +21,7 @@ import {
 	providerDisplayName,
 	providerNameFrom,
 } from "./backend/capabilities";
+import { setVaultConfigDir } from "./context/eligibility";
 import { knownEvidenceKindLabels } from "./context/evidence";
 import { ObsidianVaultFs } from "./obsidianVaultFs";
 import { ObsidianVaultReader } from "./obsidianVaultReader";
@@ -131,6 +132,7 @@ export default class WritingBuddyPlugin extends Plugin {
 	private backend!: AIBackend;
 	private ready!: Promise<void>;
 	private markReady!: () => void;
+	private settingTab: WritingBuddySettingTab | null = null;
 	private readonly projectEventTimers = new Map<string, number>();
 	private projectEventChain: Promise<void> = Promise.resolve();
 	private readonly selectionEditorViews = new Set<EditorView>();
@@ -143,6 +145,9 @@ export default class WritingBuddyPlugin extends Plugin {
 		this.ready = new Promise<void>((resolve) => {
 			this.markReady = resolve;
 		});
+
+		// The configuration folder can be renamed by the user; nothing in it is manuscript.
+		setVaultConfigDir(this.app.vault.configDir);
 
 		this.deviceStore = new DeviceStore();
 		this.deviceSettings = this.deviceStore.load();
@@ -221,7 +226,7 @@ export default class WritingBuddyPlugin extends Plugin {
 				if (!this.sessions.isLoaded) return;
 				if (!shouldObserveMarkdownSelection(update)) return;
 				const attachment = captureSelection(
-					update.editor as unknown as Parameters<typeof captureSelection>[0],
+					update.editor,
 					update.filePath,
 				);
 				this.selectionBridge.observeUserSelection(attachment);
@@ -230,7 +235,8 @@ export default class WritingBuddyPlugin extends Plugin {
 		}));
 
 		this.registerView(WRITING_BUDDY_VIEW, (leaf) => new WritingBuddyView(leaf, this));
-		this.addSettingTab(new WritingBuddySettingTab(this.app, this));
+		this.settingTab = new WritingBuddySettingTab(this.app, this);
+		this.addSettingTab(this.settingTab);
 		this.addRibbonIcon(ICONS.brand, t("settings.pluginName"), () => void this.activateView());
 		this.registerCommands();
 		this.registerEditorMenu();
@@ -288,11 +294,16 @@ export default class WritingBuddyPlugin extends Plugin {
 		return this.saveDeviceSettings();
 	}
 
-	async onunload(): Promise<void> {
+	onunload(): void {
 		for (const timer of this.projectEventTimers.values()) window.clearTimeout(timer);
 		this.projectEventTimers.clear();
 		this.selectionBridge?.dispose();
 		this.selectionEditorViews.clear();
+		// Obsidian does not wait for unload; in-flight work is cancelled in the background.
+		void this.cancelInFlightWork();
+	}
+
+	private async cancelInFlightWork(): Promise<void> {
 		const foreground = this.foregroundTurns.activeLease;
 		if (foreground) {
 			await this.cancelGeneration(foreground);
@@ -677,6 +688,7 @@ export default class WritingBuddyPlugin extends Plugin {
 
 	refreshViews(): void {
 		for (const view of this.views()) view.render();
+		this.settingTab?.refresh();
 	}
 
 	/** Keep editor marks in sync without moving or focusing any editor. */
@@ -1081,7 +1093,7 @@ export default class WritingBuddyPlugin extends Plugin {
 		selected: boolean,
 	): Promise<void> {
 		const snapshot = selected
-			? captureSelection(editor as unknown as Parameters<typeof captureSelection>[0], filePath)
+			? captureSelection(editor, filePath)
 			: null;
 		if (!snapshot) {
 			this.selectionBridge.cancelProgrammaticSelection(target);
@@ -1293,7 +1305,7 @@ class ObsidianVaultScopedStorage implements VaultScopedStorage {
 	constructor(private readonly app: App) {}
 
 	get(key: string): string | null {
-		const value = this.app.loadLocalStorage(`${ObsidianVaultScopedStorage.PREFIX}${key}`);
+		const value: unknown = this.app.loadLocalStorage(`${ObsidianVaultScopedStorage.PREFIX}${key}`);
 		return typeof value === "string" ? value : null;
 	}
 

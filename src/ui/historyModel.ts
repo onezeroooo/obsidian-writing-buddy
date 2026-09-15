@@ -220,7 +220,7 @@ export function excerptAround(text: string, index: number, length: number, radiu
 	// `index` is a UTF-16 offset; convert it to a code-point offset so CJK and
 	// emoji do not shift the window.
 	const prefixPoints = Array.from(text.slice(0, index).replace(/\s+/g, " ")).length;
-	const matchPoints = Array.from(text.substr(index, length)).length;
+	const matchPoints = Array.from(text.slice(index, index + length)).length;
 
 	const start = Math.max(0, prefixPoints - radius);
 	const end = Math.min(characters.length, prefixPoints + matchPoints + radius);

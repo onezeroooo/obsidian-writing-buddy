@@ -1047,7 +1047,7 @@ async function cancellableRead(
 	throwIfStopped(options, now);
 	const signal = options.signal;
 	const remaining = options.deadlineAt === undefined ? null : Math.max(0, options.deadlineAt - now());
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: number | undefined;
 	let abortListener: (() => void) | undefined;
 	const gates: Array<Promise<never>> = [];
 	if (signal) {
@@ -1059,7 +1059,7 @@ async function cancellableRead(
 	}
 	if (remaining !== null) {
 		gates.push(new Promise<never>((_resolve, reject) => {
-			timer = setTimeout(() => reject(new ResearchRetrievalDeadlineError()), remaining);
+			timer = window.setTimeout(() => reject(new ResearchRetrievalDeadlineError()), remaining);
 		}));
 	}
 	try {
@@ -1068,7 +1068,7 @@ async function cancellableRead(
 		throwIfStopped(options, now);
 		return text;
 	} finally {
-		if (timer !== undefined) clearTimeout(timer);
+		if (timer !== undefined) window.clearTimeout(timer);
 		if (signal && abortListener) signal.removeEventListener("abort", abortListener);
 	}
 }

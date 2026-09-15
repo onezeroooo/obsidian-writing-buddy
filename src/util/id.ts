@@ -8,7 +8,7 @@ const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 function randomBytes(count: number): Uint8Array {
 	const out = new Uint8Array(count);
-	const cryptoObj = (globalThis as { crypto?: Crypto }).crypto;
+	const cryptoObj = (window as { crypto?: Crypto }).crypto;
 	if (cryptoObj?.getRandomValues) {
 		cryptoObj.getRandomValues(out);
 		return out;

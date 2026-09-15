@@ -15,6 +15,7 @@
 
 import { App, Modal, Setting } from "obsidian";
 import { t } from "../i18n";
+import { markDestructive } from "./components/destructiveButton";
 
 export interface ConfirmOptions {
 	title: string;
@@ -56,7 +57,7 @@ export class ConfirmModal extends Modal {
 			);
 		controls.addButton((button) => {
 			button.setButtonText(this.options.confirmText);
-			if (this.options.destructive) button.setWarning();
+			if (this.options.destructive) markDestructive(button);
 			else button.setCta();
 			button.onClick(() => this.finish(true));
 		});

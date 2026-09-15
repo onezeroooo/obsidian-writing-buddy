@@ -58,6 +58,7 @@ import { describeError, persistableUsage, type TurnFacts } from "./ConversationC
 import { conversationMessages } from "./conversationHistory";
 import { sharedContinueOutputInstruction, sharedRewriteOutputInstruction } from "../instructions/sharedInstructions";
 import { replaceExecutionIdentity, restoreSelectedExecutionIdentity, selectedExecutionIdentity } from "../util/executionIdentity";
+import { asError } from "../util/errors";
 
 /** Four action turns permit two search/read cycles or a later coverage handoff. */
 export const MAX_RESEARCH_PLANNING_ROUNDS = 4;
@@ -726,7 +727,7 @@ export class ResearchController {
 		try {
 			outcome = await consume(this.backend.chat(payload), job, onFinalDelta);
 		} finally {
-			clearTimeout(timer);
+			window.clearTimeout(timer);
 			if (job.requestId === requestId) job.requestId = null;
 		}
 		if (!outcome.ok) restoreSelectedExecutionIdentity(outcome.metadata, preferences);
@@ -735,9 +736,9 @@ export class ResearchController {
 		return outcome;
 	}
 
-	private armDeadline(job: ActiveResearchJob, deadlineAt: number, requestId: string): ReturnType<typeof setTimeout> {
+	private armDeadline(job: ActiveResearchJob, deadlineAt: number, requestId: string): number {
 		const remaining = Math.max(0, deadlineAt - this.now());
-		return setTimeout(() => {
+		return window.setTimeout(() => {
 			if (this.activeJob !== job || job.requestId !== requestId || job.cancelled) return;
 			job.deadlineExceeded = true;
 			job.abortController.abort();
@@ -876,7 +877,7 @@ function nextOrAbort<T>(next: Promise<IteratorResult<T>>, signal: AbortSignal): 
 		signal.addEventListener("abort", onAbort, { once: true });
 		next.then(
 			(value) => { signal.removeEventListener("abort", onAbort); resolve(value); },
-			(error) => { signal.removeEventListener("abort", onAbort); reject(error); },
+			(error: unknown) => { signal.removeEventListener("abort", onAbort); reject(asError(error)); },
 		);
 	});
 }
@@ -1041,7 +1042,7 @@ function mergeMetadata(target: GenerationMetadata, source: GenerationMetadata): 
 
 function mergeFacts(target: TurnFacts, source: TurnFacts): void {
 	for (const key of ["cachedInputTokens", "reasoningTokens", "runtimeMs", "attempts"] as const) {
-		if (source[key] !== undefined) target[key] = (target[key] ?? 0) + source[key]!;
+		if (source[key] !== undefined) target[key] = (target[key] ?? 0) + source[key];
 	}
 	if (source.granularity) target.granularity = source.granularity;
 }

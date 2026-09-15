@@ -6,6 +6,7 @@ import type { AIConnection } from "../connections/types";
 import { acceptsApiKey, newConnectionFor, providerOf, requiresApiKey, searchProviders, type ProviderDefinition } from "../connections/providers";
 import { createConnectionId } from "../util/id";
 import { healthLabel } from "./components/header";
+import { markDestructive } from "./components/destructiveButton";
 
 /**
  * Add or edit an AI connection.
@@ -69,7 +70,7 @@ export class ConnectionModal extends Modal {
 
 		const actions = new Setting(contentEl).setClass("wb-connection-modal-actions");
 		if (!this.creating) {
-			actions.addButton((button) => button.setButtonText(t("connModal.delete")).setWarning().setDisabled(this.busyAction !== null).onClick(() => void this.remove()));
+			actions.addButton((button) => markDestructive(button.setButtonText(t("connModal.delete"))).setDisabled(this.busyAction !== null).onClick(() => void this.remove()));
 		}
 		actions
 			.addButton((button) => button.setButtonText(this.busyAction === "test" ? t("settings.connections.testing") : t("settings.connections.test")).setDisabled(this.busyAction !== null).onClick(() => void this.test()))

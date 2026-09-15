@@ -3,6 +3,8 @@
  * controllers. A lease is an identity, not just a boolean: stale cleanup from
  * an older turn can never release (or cancel) a newer owner's work.
  */
+import { asError } from "../util/errors";
+
 export interface ForegroundTurnLease<Owner extends object> {
 	readonly owner: Owner;
 	readonly token: symbol;
@@ -81,7 +83,7 @@ export class ForegroundTurnCoordinator<Owner extends object> {
 				},
 				(error: unknown) => {
 					lease.signal.removeEventListener("abort", onAbort);
-					reject(error);
+					reject(asError(error));
 				},
 			);
 		});
@@ -103,7 +105,7 @@ export class ForegroundTurnCoordinator<Owner extends object> {
 			try {
 				active.cancellation = Promise.resolve(cancelOwnedWork());
 			} catch (error) {
-				active.cancellation = Promise.reject(error);
+				active.cancellation = Promise.reject(asError(error));
 			}
 		}
 		await active.cancellation;

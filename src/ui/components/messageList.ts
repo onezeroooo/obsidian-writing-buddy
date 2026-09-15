@@ -38,7 +38,7 @@ export const REPLY_TIME_ATTRIBUTE = "data-wb-reply-at";
 import { renderAttachmentChip } from "./attachmentChip";
 import { type ContextCitation, type ProseSegment } from "../citations";
 import type { MessageBlock } from "../messageBlocks";
-import { type RewriteCandidate, renderCandidateCard } from "./candidateCard";
+import { renderCandidateCard } from "./candidateCard";
 import type { DiffViewMode } from "../diffView";
 
 /** Where a branch was taken, and where this conversation came from. */
@@ -105,7 +105,7 @@ export function renderMessages(parent: HTMLElement, options: MessageListOptions)
 			}
 			renderCandidateCard(element, {
 				blockKey: block.key,
-				candidate: block.candidate as RewriteCandidate,
+				candidate: block.candidate,
 				onSetMode: (mode) => options.onSetDiffMode(block.key, mode),
 				onApply: () => options.onApply(block.key),
 				onUndo: () => options.onUndo(block.key),

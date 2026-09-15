@@ -293,7 +293,7 @@ export class ProjectStore {
 		// Read and enumerate the entire source before creating a new current root.
 		// A source-side failure therefore cannot leave a first-run migration that
 		// looks complete merely because WritingBuddy/ now exists.
-		const binaryMigration = Boolean(this.fs.readBinary && this.fs.writeBinary);
+		const binaryMigration = typeof this.fs.readBinary === "function" && typeof this.fs.writeBinary === "function";
 		const plan: Array<{ from: string; to: string; contents: string | ArrayBuffer }> = [];
 		const stageFile = async (from: string, to: string): Promise<void> => {
 			try {
@@ -911,7 +911,7 @@ export class ProjectStore {
 	async loadEditHistory(): Promise<EditToken[]> {
 		if (!(await this.fs.exists(EDIT_HISTORY_FILE))) return [];
 		try {
-			const decoded = JSON.parse(await this.fs.read(EDIT_HISTORY_FILE));
+			const decoded: unknown = JSON.parse(await this.fs.read(EDIT_HISTORY_FILE));
 			if (!Array.isArray(decoded)) return [];
 			return decoded.filter(isEditToken);
 		} catch {

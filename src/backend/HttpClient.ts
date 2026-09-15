@@ -16,7 +16,7 @@ export interface HttpResponse {
 
 export type HttpClient = (request: HttpRequest) => Promise<HttpResponse>;
 
-export function fetchHttpClient(fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)): HttpClient {
+export function fetchHttpClient(fetchImpl: typeof fetch = window.fetch.bind(window)): HttpClient {
 	return async (request) => {
 		const response = await fetchImpl(request.url, {
 			method: request.method,
