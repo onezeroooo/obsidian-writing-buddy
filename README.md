@@ -2,7 +2,7 @@
 
 # Writing Buddy
 
-**AI writing for long-form work in Obsidian. Think across your manuscript, rewrite with review, and keep every edit under your control.**
+**A writing partner for your long-form work in Obsidian. Explore the manuscript. Review the rewrite. Keep the final say.**
 
 English | [简体中文](README.zh-CN.md)
 
@@ -13,9 +13,15 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-Writing Buddy is an Obsidian-native workspace for writing with AI without handing your manuscript over to it.
+Writing Buddy brings AI into your writing workspace: ask about a passage, work through a scene, or check whether a character's choices fit the chapters that came before.
 
-Ask questions about a passage. Rewrite or continue a scene. Check pacing or consistency across a long project. Bring your own model. Every generated change stays a candidate until you choose to apply it.
+Bring your own model. Every generated edit stays a candidate until you choose **Apply**.
+
+![A selected passage alongside a proposed rewrite, highlighted differences, and the Apply button](docs/screenshots/01-rewrite-review.png)
+
+*From selection to suggestion to review, without leaving the manuscript.*
+
+If Writing Buddy is useful to you, [give it a star on GitHub](https://github.com/onezeroooo/obsidian-writing-buddy). Want to help with its upkeep? You can [buy me a coffee on Ko-fi](https://ko-fi.com/onezeroooo). Support is entirely optional; all plugin features are free.
 
 ## Built for long-form writing
 
@@ -24,7 +30,7 @@ Ask questions about a passage. Rewrite or continue a scene. Check pacing or cons
 | **Work from the manuscript** | Select text, ask a question, rewrite a passage, or continue writing without leaving Obsidian. |
 | **Think beyond one selection** | Stay local, let Writing Buddy research more of the manuscript, or use full manuscript coverage when the task requires it. |
 | **Review before anything changes** | Writing actions produce candidates and diffs first. The manuscript changes only after you choose Apply. |
-| **Use writing workflows, not just chat** | Built-in Skills cover rewriting, polishing, shortening, expanding, continuing, scene polish, pacing review, and project consistency. |
+| **Start with a writing task** | Built-in Skills cover rewriting, polishing, tightening, expanding, continuing, scene polish, pacing checks, and consistency checks. |
 | **Make it yours** | Add project instructions, customize built-in Skills, create your own Skills, and choose model effort and context per conversation. |
 
 ## Context that matches the task
@@ -37,7 +43,11 @@ Writing Buddy separates manuscript context from the model's own reasoning effort
 | **Full** | The complete eligible manuscript. |
 | **Low** | The selection, nearby context, and the active note only. Other files are not included. |
 
-Writing Buddy decides which Vault content is eligible, performs the reads itself, and enforces the context boundary. AI connections receive text, not Vault paths or filesystem access.
+Writing Buddy selects and reads eligible content. Connections receive the supplied text and citation context; they cannot browse your filesystem. Full coverage applies to the eligible manuscript, and incomplete results are labelled as such.
+
+![A consistency check cites The Rule, The Message, and Last Train to examine whether Mara's wait fits earlier scenes](docs/screenshots/02-project-context.png)
+
+*A question about one scene, checked against the chapters that establish it.*
 
 ## Writing Skills
 
@@ -47,20 +57,24 @@ Writing Buddy includes eight writing-focused Skills:
 |---|---|
 | **Rewrite** | Rewrite a selected passage while preserving its role in the scene. |
 | **Polish** | Improve clarity, rhythm, and expression. |
-| **Shorten** | Tighten prose without losing important content. |
+| **Tighten** | Tighten prose without losing important content. |
 | **Expand** | Develop a passage with useful detail. |
 | **Continue** | Continue from the selected passage in context. |
 | **Scene Polish** | Improve dialogue, transitions, scene flow, and showing versus telling where needed. |
-| **Pacing** | Diagnose where a passage loses momentum and explain why. |
-| **Consistency** | Check characters, continuity, setup, payoff, and other project-level facts against manuscript evidence. |
+| **Pacing check** | Diagnose where a passage loses momentum and explain why. |
+| **Consistency check** | Check characters, continuity, setup, payoff, and other project-level facts against manuscript evidence. |
 
-Built-in Skills stay release-owned, but you can add your own requirements to them. You can also create entirely new Skills and keep them in the Vault with the rest of your writing project.
+![Eight built-in writing Skills with controls for viewing and customizing their instructions](docs/screenshots/04-skills.png)
+
+Add your preferences to the built-in Skills, or create your own. Your customizations live in the Vault with the writing project and stay separate from built-in updates.
 
 Project instructions apply across the manuscript, so recurring preferences do not have to be repeated in every conversation. See [Writing Skills](docs/SKILLS.md).
 
 ## Your AI, your choice
 
 Writing Buddy has no account and no bundled model. Add one or more AI Connections and choose the one each conversation should use.
+
+Hosted providers may require their own account, API key, and paid usage. Those charges are separate from this free plugin. Local models are supported through Ollama or a compatible endpoint.
 
 Supported options include OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Mistral, Groq, Cerebras, Together AI, Fireworks AI, Perplexity, Hugging Face, SiliconFlow, Ollama, and custom OpenAI-compatible endpoints.
 
@@ -76,18 +90,24 @@ Rewrite and Continue return candidates first. Applying a change is a local opera
 
 For Chinese prose, rewrite review uses character-level diff so small wording changes remain easy to inspect.
 
+## English and Chinese
+
+The interface can follow Obsidian, or use English or Chinese explicitly. The instruction language defaults to the interface language and can be set separately for your project. See the [Chinese walkthrough](README.zh-CN.md) for a real Chinese manuscript, rewrite review, and consistency check.
+
 ## Privacy and your data
 
 - **No Writing Buddy account.** You connect your own provider or endpoint, under its own terms.
 - **Your project data stays in the Vault.** Conversations, project instructions, and Skills are ordinary files under `WritingBuddy/`.
 - **Credentials stay on this device.** API keys and connection credentials are not written into synced Vault files.
 - **No telemetry or analytics.**
-- **What leaves the Vault:** when you send a turn, Writing Buddy sends the selected text, applicable instructions, and the context assembled for that request to the selected connection. Nothing is sent when you are not making a request.
+- **What leaves the Vault:** when you send a turn, Writing Buddy sends the selected text, applicable instructions, relevant conversation history, and the context assembled for that request to the selected connection. Connection checks and model discovery can also contact configured endpoints; they do not send your manuscript.
 - **Security reports:** see [SECURITY.md](SECURITY.md) for the private reporting path.
 
 The provider or endpoint you choose has its own privacy and data policies.
 
 ## Quick Start
+
+**Community listing is not yet available.** The steps below apply once Writing Buddy is accepted into the directory. The [GitHub release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.1) contains the plugin files and release notes.
 
 1. Open **Settings → Community plugins → Browse** in Obsidian.
 2. Search for **Writing Buddy** and install it.
@@ -95,7 +115,9 @@ The provider or endpoint you choose has its own privacy and data policies.
 4. Add an AI connection under **Settings → Writing Buddy → AI Connections**.
 5. Open a note and start from the manuscript.
 
-Updates are delivered through Community plugins, like any other Obsidian plugin.
+Updates will arrive through Community plugins once the listing is available.
+
+After setup, select a passage and try: *“Make this more restrained. Keep the disappointment clear without explaining it directly.”* Review the differences, then apply the version you want to keep.
 
 ## Requirements
 
@@ -103,11 +125,23 @@ Obsidian 1.4.5 or later, on desktop or mobile.
 
 On mobile, the selected provider or endpoint must be reachable from the device. A model server listening only on another machine's loopback address cannot be reached from a phone or tablet.
 
+<img src="docs/screenshots/06-mobile.png" alt="Writing Buddy rewrite review in a narrow layout, with Diff, Apply, and Undo controls" width="360">
+
+*Rewrite review in a narrow layout.*
+
 ## Source and development
 
 Writing Buddy is open source under the MIT license. This public repository contains the product source for each released version, the files needed to build it, user documentation, and the distributed plugin artifacts.
 
-Development happens in a private workspace so internal AI context, experiments, unfinished plans, machine-specific configuration, and development history do not become part of the product repository. Each public release is exported through an explicit allowlist from a clean development tree.
+To build from source, use Node.js 20.19 or later and run:
+
+```sh
+npm ci
+npm run build
+npm run smoke
+```
+
+Found a problem or have a suggestion? [Open an issue](https://github.com/onezeroooo/obsidian-writing-buddy/issues) with the plugin version and steps to reproduce. Please leave API keys and private manuscript text out of public reports.
 
 ## License
 

@@ -29,6 +29,7 @@
  */
 
 import type { ConversationMessage, ConversationSession, SelectionAttachment } from "../types";
+import { UNTITLED } from "../session/titles";
 import {
 	parseBranch,
 	parseMessage,
@@ -171,7 +172,7 @@ export function parseManifest(decoded: unknown): ParseResult<ParsedManifest> {
 	const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date(0).toISOString();
 	const manifest: ParsedManifest = {
 		id,
-		title: typeof record.title === "string" ? record.title : "未命名对话",
+		title: typeof record.title === "string" ? record.title : UNTITLED,
 		titleIsManual: record.titleIsManual === true,
 		createdAt,
 		updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : createdAt,

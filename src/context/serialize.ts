@@ -15,6 +15,7 @@
 import type { ContextDocumentPayload } from "../backend/AIBackend";
 import type { AssembledContext } from "./types";
 import { buildEvidence, evidenceDocumentPayloads } from "./evidence";
+import { instructionLocale, t } from "../i18n";
 
 export interface DocumentPayloadOptions {
 	/**
@@ -57,9 +58,12 @@ export function renderDocumentsBlock(documents: ContextDocumentPayload[]): strin
 	const usable = documents.filter((document) => document.text.trim().length > 0);
 	if (usable.length === 0) return "";
 
+	const en = instructionLocale() === "en";
 	return [
-		"## 项目资料（由 WritingBuddy 从本地 Vault 提供）",
-		"以下内容已随本次请求附上，请直接使用，不需要也无法另行读取文件。引用时请使用下面给出的 Vault 相对路径。",
+		en ? "## Project material (provided by Writing Buddy from the local Vault)" : "## 项目资料（由 WritingBuddy 从本地 Vault 提供）",
+		en
+			? "The material below is attached to this request. Use it directly; there is no need, and no way, to read files separately. When citing, use the Vault-relative paths given below."
+			: "以下内容已随本次请求附上，请直接使用，不需要也无法另行读取文件。引用时请使用下面给出的 Vault 相对路径。",
 		...usable.map((document) => `### \`${document.path}\`\n\n${document.text}`),
 	].join("\n\n");
 }
@@ -78,9 +82,9 @@ export function composeMessageWithContext(ask: string, contextBlock: string): st
 /** A one-line summary for the activity disclosure. */
 export function describeContext(context: AssembledContext): string {
 	const parts: string[] = [];
-	if (context.selection) parts.push(`选区 ${Array.from(context.selection.text).length} 字`);
-	if (context.documents.length > 0) parts.push(`${context.documents.length} 份资料`);
-	parts.push(`${context.charsUsed} 字上下文`);
-	if (context.omitted.length > 0) parts.push(`${context.omitted.length} 份未附上`);
+	if (context.selection) parts.push(t("context.describeSelection", { count: Array.from(context.selection.text).length }));
+	if (context.documents.length > 0) parts.push(t("context.describeDocuments", { count: context.documents.length }));
+	parts.push(t("context.describeChars", { count: context.charsUsed }));
+	if (context.omitted.length > 0) parts.push(t("context.describeOmitted", { count: context.omitted.length }));
 	return parts.join(" · ");
 }

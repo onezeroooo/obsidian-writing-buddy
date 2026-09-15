@@ -277,7 +277,8 @@ export class DirectAPIBackend implements AIBackend {
 			let raw: unknown;
 			try { raw = JSON.parse(data); } catch { continue; }
 			const chunk = streamChunk(provider, object(raw));
-			if (chunk.error) throw new Error(chunk.error);
+			// Server-authored text, bounded like an HTTP error body; the catch redacts the credential.
+			if (chunk.error) throw new Error(chunk.error.slice(0, 200));
 			if (chunk.text) {
 				text += chunk.text;
 				if (text.length > MAX_REPLY_CHARS) throw new ReplyTooLargeError();

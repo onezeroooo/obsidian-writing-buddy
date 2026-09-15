@@ -7,7 +7,12 @@
  * live here. Intermediate memos never escape this controller.
  */
 
-import { t } from "../i18n";
+import { instructionLocale, t } from "../i18n";
+
+/** The model is addressed in the instruction language; both editions say the same thing. */
+function say(zh: string, en: string): string {
+	return instructionLocale() === "en" ? en : zh;
+}
 import type { AIBackend, AIEvent, RequestMessage, SkillPayload, TurnPayload, UsageInfo } from "../backend/AIBackend";
 import {
 	buildFullCorpusSnapshot,
@@ -559,17 +564,15 @@ export class FullCorpusController {
 			const fallback = memos.map((memo) => memo.text).join("\n\n");
 			const usedFallback = !finalOutcome.ok || citationProblem !== null;
 			const chosen = !usedFallback ? finalOutcome.text
-				: `${job.softDeadlineReached
-					? "部分正文的分卷备忘，未汇总为全文结论：\n\n"
-					: "已读完全文的分卷备忘，未汇总为全文结论：\n\n"}${fallback}`;
+				: `${job.softDeadlineReached ? t("corpus.memosPartial") : t("corpus.memosComplete")}\n\n${fallback}`;
 			const fallbackProblem = finalCitationProblem(chosen, finalAllowedIds, true);
 			if (fallbackProblem) {
 				const failure: CallOutcome = { ok: false, text: "", metadata: {}, facts: {}, error: t("corpus.finalCitationFormat", { problem: fallbackProblem }), cancelled: false, deadlineExceeded: false };
 				return this.failedResult(job, snapshot, completedBatchIndexes, reductionBatches, aggregateMetadata, requestIds, failure, t("corpus.finalCitationFailed"), options);
 			}
 			const answer = keepAllowedEvidenceIds(
-				job.softDeadlineReached && !chosen.startsWith("部分分析（因时间限制未覆盖全文）")
-					? `部分分析（因时间限制未覆盖全文）：\n\n${chosen}`
+				job.softDeadlineReached && !chosen.startsWith(t("corpus.partialAnalysis"))
+					? `${t("corpus.partialAnalysis")}\n\n${chosen}`
 					: chosen,
 				finalAllowedIds,
 			);
@@ -1042,7 +1045,7 @@ function corpusEvidenceIndex(snapshot: FullCorpusSnapshot): CorpusEvidenceIndex 
 
 		const item: EvidenceItem = {
 			...shared, id,
-			excerpt: chunk.text.length > 0 ? chunk.text : "（空文件）",
+			excerpt: chunk.text.length > 0 ? chunk.text : t("corpus.emptyFile"),
 			...(range ? { range } : {}),
 			...(blocks ? { citationBlocks: blocks } : {}),
 		};
@@ -1058,7 +1061,7 @@ function corpusEvidenceIndex(snapshot: FullCorpusSnapshot): CorpusEvidenceIndex 
 				...shared, id: block.id, excerpt: block.text,
 				// The label is what a saved conversation keys on, so a block
 				// cannot share its chunk's. The suffix says which paragraph.
-				label: `${shared.label} · 段${blockOrdinal(block.id)}`,
+				label: `${shared.label} · ${say("段", "para. ")}${blockOrdinal(block.id)}`,
 				...(blockRange ? { range: blockRange } : {}),
 			});
 			chunkByEvidenceId.set(block.id, chunk);
@@ -1300,8 +1303,16 @@ function citationClaims(text: string): string[] {
 
 function memoDocuments(memos: readonly Memo[], level: number): NonNullable<TurnPayload["documents"]> {
 	return [
-		{ path: "（全文汇总说明）", text: "这些是客户端对同一冻结全文快照生成的中间备忘。方括号中的 [S数字] 与 [S数字.B数字] 都是原文证据编号；必须原样保留，不能改号、补号、降级为所属编号或猜测。" },
-		...memos.map((memo, index) => ({ path: `（第 ${level} 层备忘 ${index + 1}/${memos.length}）`, text: memo.text })),
+		{
+			// Full-width parentheses in both languages: the opaque-label grammar
+			// `safePath.ts` accepts is written with them.
+			path: say("（全文汇总说明）", "（full-manuscript summary note）"),
+			text: say(
+				"这些是客户端对同一冻结全文快照生成的中间备忘。方括号中的 [S数字] 与 [S数字.B数字] 都是原文证据编号；必须原样保留，不能改号、补号、降级为所属编号或猜测。",
+				"These are intermediate memos the client produced over the same frozen full-manuscript snapshot. The bracketed [S<number>] and [S<number>.B<number>] are evidence ids for the original text; keep them exactly as they are — never renumber, add, downgrade to the containing id, or guess.",
+			),
+		},
+		...memos.map((memo, index) => ({ path: say(`（第 ${level} 层备忘 ${index + 1}/${memos.length}）`, `（level ${level} memo ${index + 1}/${memos.length}）`), text: memo.text })),
 	];
 }
 
@@ -1345,12 +1356,12 @@ function splitMemo(memo: Memo): Memo[] {
 
 function leafPrompt(index: number, total: number): string {
 	return [
-		`你正在分析同一份冻结全文快照的第 ${index + 1}/${total} 批。`,
-		"用户最终问题已经作为本次冻结消息中的最后一条作者消息提供；不要复述或改写它。",
-		"只输出供后续汇总使用的紧凑分析备忘，不要声称已经看完全文，也不要直接写最终答复。",
-		"每个原子判断独占一项，记录与问题有关的事实、模式、矛盾和例外。",
-		"这是内部 provenance 阶段：每项保留所有直接支持它的本批真实 [S数字]，不要为了展示简洁而抽样或限制引用。",
-		"证据正文中每个段落前标有 [S数字.B数字] 形式的块编号。引用时优先使用最直接支持该判断的块编号；只有当判断确实横跨整份证据、没有更细的块可用时，才使用不带 .B 的 [S数字]。",
+		say(`你正在分析同一份冻结全文快照的第 ${index + 1}/${total} 批。`, `You are analysing batch ${index + 1}/${total} of one frozen full-manuscript snapshot.`),
+		say("用户最终问题已经作为本次冻结消息中的最后一条作者消息提供；不要复述或改写它。", "The user's final question is already provided as the last writer message in this frozen conversation; do not restate or rephrase it."),
+		say("只输出供后续汇总使用的紧凑分析备忘，不要声称已经看完全文，也不要直接写最终答复。", "Output only a compact analysis memo for later summarisation; do not claim to have read the whole manuscript, and do not write the final answer."),
+		say("每个原子判断独占一项，记录与问题有关的事实、模式、矛盾和例外。", "One atomic claim per item, recording the facts, patterns, contradictions and exceptions relevant to the question."),
+		say("这是内部 provenance 阶段：每项保留所有直接支持它的本批真实 [S数字]，不要为了展示简洁而抽样或限制引用。", "This is the internal provenance stage: every item keeps all the real [S<number>] ids from this batch that directly support it; do not sample or cap citations for the sake of brevity."),
+		say("证据正文中每个段落前标有 [S数字.B数字] 形式的块编号。引用时优先使用最直接支持该判断的块编号；只有当判断确实横跨整份证据、没有更细的块可用时，才使用不带 .B 的 [S数字]。", "Every paragraph of the evidence is prefixed with a block id of the form [S<number>.B<number>]. Prefer the block id that most directly supports a claim; use the plain [S<number>] without .B only when the claim genuinely spans the whole item and no finer block applies."),
 	].join("\n");
 }
 
@@ -1366,36 +1377,42 @@ function leafPrompt(index: number, total: number): string {
  */
 function reductionPrompt(level: number): string {
 	return [
-		`这是全文分析的第 ${level} 层汇总。用户最终问题已经在冻结消息中提供。`,
-		"把所附备忘压缩为明显更短的汇总备忘，合并重复项，保留冲突、例外和关键细节。",
-		`输出总长不得超过 ${REDUCTION_OUTPUT_CHARS} 字，这是硬性预算：超出会让汇总无法收敛。压缩靠合并与取舍，不是删掉判断本身。`,
-		"只能使用输入中真实出现的 [S数字] 与 [S数字.B数字] 编号，不要发明；块编号不得为了简洁替换成它所属的 [S数字]，那会让证据退回整块粒度。",
-		`每个原子判断最多保留 ${MAX_FINAL_CITATIONS_PER_CLUSTER} 个最直接支持它的编号，优先保留块编号；一个判断似乎需要更多编号时，把它拆成更小的原子判断分别引用。`,
-		"这仍是中间备忘，不要声称已经完成全文回答。",
+		say(`这是全文分析的第 ${level} 层汇总。用户最终问题已经在冻结消息中提供。`, `This is level ${level} of the full-manuscript summarisation. The user's final question is already in the frozen conversation.`),
+		say("把所附备忘压缩为明显更短的汇总备忘，合并重复项，保留冲突、例外和关键细节。", "Compress the attached memos into a clearly shorter summary memo: merge duplicates, keep conflicts, exceptions and key details."),
+		say(`输出总长不得超过 ${REDUCTION_OUTPUT_CHARS} 字，这是硬性预算：超出会让汇总无法收敛。压缩靠合并与取舍，不是删掉判断本身。`, `The output must not exceed ${REDUCTION_OUTPUT_CHARS} characters; this is a hard budget, and exceeding it keeps the summarisation from converging. Compress by merging and choosing, not by dropping the claims themselves.`),
+		say("只能使用输入中真实出现的 [S数字] 与 [S数字.B数字] 编号，不要发明；块编号不得为了简洁替换成它所属的 [S数字]，那会让证据退回整块粒度。", "Use only [S<number>] and [S<number>.B<number>] ids that actually appear in the input; never invent one. Do not replace a block id with its containing [S<number>] for brevity — that drops the evidence back to whole-block granularity."),
+		say(`每个原子判断最多保留 ${MAX_FINAL_CITATIONS_PER_CLUSTER} 个最直接支持它的编号，优先保留块编号；一个判断似乎需要更多编号时，把它拆成更小的原子判断分别引用。`, `Keep at most ${MAX_FINAL_CITATIONS_PER_CLUSTER} of the most direct supporting ids per atomic claim, preferring block ids; when a claim seems to need more, split it into smaller atomic claims and cite each separately.`),
+		say("这仍是中间备忘，不要声称已经完成全文回答。", "This is still an intermediate memo; do not claim the full-manuscript answer is complete."),
 	].join("\n");
 }
 
 function finalPrompt(partial = false): string {
 	return [
 		partial
-			? "客户端只完成了冻结全文快照的一部分批次，并把已完成结果汇总在所附备忘中。答案必须明确说明未覆盖全文，不得声称这是完整全文结论。"
-			: "客户端已经逐批分析完整的冻结全文快照，并把中间结果汇总在所附备忘中。",
-		"现在请直接回答用户的问题。综合所有备忘，保留重要分歧和例外，不要提到批次、map/reduce 或中间备忘。",
-		"中间备忘保留了完整 provenance，但最终答案不要复述整棵祖先引用集合。",
-		"每个实质性判断或结构化条目默认只保留 1–2 个最直接支持它的 [S数字]。只有该项必须由 3–4 个彼此不可替代的来源共同成立时才可使用 3–4 个；若看似需要 5 个以上，应拆成多个原子判断并分别引用直接证据。",
-		"不得为了减少引用而写出缺乏证据的判断。只使用备忘中真实出现且直接支持当前判断的编号，不要编造。",
-		"备忘中的块编号 [S数字.B数字] 要原样保留，不要替换成它所属的 [S数字]：读者会点击这个编号定位原文，块编号指向具体段落，[S数字] 指向整个处理块。",
-		"人物出场或时间线任务优先按位置、事件、时间点、作用组织；只有这些字段与用户问题相关时才使用，不要强行补全。",
+			? say(
+					"客户端只完成了冻结全文快照的一部分批次，并把已完成结果汇总在所附备忘中。答案必须明确说明未覆盖全文，不得声称这是完整全文结论。",
+					"The client completed only part of the batches of the frozen full-manuscript snapshot and summarised the finished results in the attached memos. The answer must state clearly that it does not cover the whole manuscript, and must not claim to be a complete full-manuscript conclusion.",
+				)
+			: say(
+					"客户端已经逐批分析完整的冻结全文快照，并把中间结果汇总在所附备忘中。",
+					"The client analysed the complete frozen full-manuscript snapshot batch by batch and summarised the intermediate results in the attached memos.",
+				),
+		say("现在请直接回答用户的问题。综合所有备忘，保留重要分歧和例外，不要提到批次、map/reduce 或中间备忘。", "Now answer the user's question directly. Synthesise all memos, keep the important disagreements and exceptions, and do not mention batches, map/reduce or intermediate memos."),
+		say("中间备忘保留了完整 provenance，但最终答案不要复述整棵祖先引用集合。", "The intermediate memos keep full provenance, but the final answer must not repeat the whole ancestral citation set."),
+		say("每个实质性判断或结构化条目默认只保留 1–2 个最直接支持它的 [S数字]。只有该项必须由 3–4 个彼此不可替代的来源共同成立时才可使用 3–4 个；若看似需要 5 个以上，应拆成多个原子判断并分别引用直接证据。", "By default keep only the 1–2 most direct supporting [S<number>] ids per substantive claim or structured entry. Use 3–4 only when the item genuinely rests on 3–4 sources none of which can replace another; if it seems to need 5 or more, split it into several atomic claims and cite the direct evidence for each."),
+		say("不得为了减少引用而写出缺乏证据的判断。只使用备忘中真实出现且直接支持当前判断的编号，不要编造。", "Never write an unsupported claim to reduce citations. Use only ids that actually appear in the memos and directly support the claim at hand; never invent one."),
+		say("备忘中的块编号 [S数字.B数字] 要原样保留，不要替换成它所属的 [S数字]：读者会点击这个编号定位原文，块编号指向具体段落，[S数字] 指向整个处理块。", "Keep block ids [S<number>.B<number>] from the memos exactly as they are; do not replace one with its containing [S<number>]. The reader clicks the id to locate the original text: a block id points at a specific paragraph, [S<number>] at a whole processing block."),
+		say("人物出场或时间线任务优先按位置、事件、时间点、作用组织；只有这些字段与用户问题相关时才使用，不要强行补全。", "For character-appearance or timeline tasks, organise by location, event, point in time and role, but only where those fields matter to the user's question; do not pad them in."),
 	].join("\n");
 }
 
 function finalRecoveryPrompt(problem?: string, partial = false): string {
 	return [
 		finalPrompt(partial),
-		"这是最后一次合成尝试。请降低推理复杂度，输出更短、更直接的答案；只保留最重要且有明确证据的判断。",
-		"答案不超过 1200 字。",
-		...(problem ? [`上一次尝试失败或未通过校验：${problem}。`] : []),
-		"仍须保留每项判断的合法原文引用，不得编造、改号或删除全部引用。",
+		say("这是最后一次合成尝试。请降低推理复杂度，输出更短、更直接的答案；只保留最重要且有明确证据的判断。", "This is the last synthesis attempt. Reduce reasoning complexity and give a shorter, more direct answer; keep only the most important claims that have clear evidence."),
+		say("答案不超过 1200 字。", "Keep the answer under 1200 characters."),
+		...(problem ? [say(`上一次尝试失败或未通过校验：${problem}。`, `The previous attempt failed or did not pass validation: ${problem}.`)] : []),
+		say("仍须保留每项判断的合法原文引用，不得编造、改号或删除全部引用。", "Every claim must still carry valid citations to the original text; do not invent, renumber or drop all citations."),
 	].join("\n");
 }
 
@@ -1642,7 +1659,7 @@ function deadlineResult(
 	setCorpusTimings(metadata, job);
 	if (!snapshot) {
 		return {
-			ok: false, error: "全文分析超过时间上限，快照未完成，未生成全文结论。",
+			ok: false, error: t("corpus.deadlineNoSnapshot"),
 			metadata: { ...metadata }, deadlineExceeded: true, failureReason: "deadline", requestIds,
 		};
 	}
@@ -1651,7 +1668,7 @@ function deadlineResult(
 	);
 	metadata.contextReport = reportFor(options, snapshot, coverage, []);
 	return {
-		ok: false, error: "全文分析超过时间上限，未生成全文结论。", metadata: { ...metadata },
+		ok: false, error: t("corpus.deadline"), metadata: { ...metadata },
 		coverage, deadlineExceeded: true, failureReason: "deadline", requestIds, ...(resumeKey ? { resumeKey } : {}),
 	};
 }
@@ -1659,13 +1676,13 @@ function deadlineResult(
 function backendCallLimitOutcome(maxBackendCalls: number): CallOutcome {
 	return {
 		ok: false, text: "", metadata: {}, facts: {},
-		error: `全文分析达到后端调用上限（${maxBackendCalls} 次）。`,
+		error: t("corpus.backendCallLimit", { count: maxBackendCalls }),
 		cancelled: false, deadlineExceeded: false, failureReason: "backend-call-limit",
 	};
 }
 
 function softDeadlineOutcome(): CallOutcome {
-	return { ok: false, text: "", metadata: {}, facts: {}, error: "为汇总和最终回答预留时间，已停止启动新的全文批次。", cancelled: false, deadlineExceeded: false, failureReason: "soft-deadline" };
+	return { ok: false, text: "", metadata: {}, facts: {}, error: t("corpus.softDeadline"), cancelled: false, deadlineExceeded: false, failureReason: "soft-deadline" };
 }
 
 export function resolveFullCorpusBackendCallLimit(leafBatches: number, override?: number): number {

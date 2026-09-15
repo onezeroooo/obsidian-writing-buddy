@@ -526,7 +526,9 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		// itself is one more thing to read on a page that is already long.
 		if (descriptors.length === 0) return;
 		const group = containerEl.createDiv({ cls: "wb-skill-group", attr: { "aria-label": label } });
-		const list = group.createDiv({ cls: "wb-skill-list" });
+		// `.setting-items` so the rows share one panel with hairlines between them,
+		// as the connection rows do, rather than a gapped stack of cards.
+		const list = group.createDiv({ cls: "wb-skill-list setting-items" });
 		this.renderCollapsibleHeading(group, "skills:" + groupKey, `${label} · ${descriptors.length}`, list, groupKey !== "builtin");
 		group.insertBefore(group.lastElementChild!, list);
 

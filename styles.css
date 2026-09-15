@@ -2128,33 +2128,41 @@
 .wb-connection-card-name > .wb-connection-health-dot { margin-top: 0; }
 
 .wb-skill-group {
-	margin-top: 14px;
+	margin-top: 8px;
 }
 
 .wb-skill-group > .setting-item-heading {
-	padding-bottom: 6px;
+	padding-bottom: 4px;
 }
 
 /* A heading that folds what is under it: the whole row is the handle. */
 .wb-collapsible-heading { cursor: pointer; user-select: none; }
 .wb-collapsible-heading .setting-item-control { flex: 0 0 auto; }
 
-.wb-skill-list {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+/*
+ * The folded body is hidden by class, not only by the `hidden` attribute.
+ * `hidden` is a user-agent `display: none`, and any author `display` on the
+ * body — ours on the list, the app's on `.setting-items` — outranks it, which
+ * left the built-in skills in full view under a chevron that said they were
+ * folded.
+ */
+.wb-settings .is-collapsed > .wb-skill-list,
+.wb-settings .is-collapsed > .setting-items {
+	display: none;
 }
 
+/*
+ * Skill rows are ordinary rows inside the app's `.setting-items` panel: one
+ * background, hairlines between rows, no card of their own. They used to draw
+ * a border, radius and background each inside a gapped list, which made the
+ * skills section the one part of the page that did not read like Obsidian.
+ */
 .wb-skill-row {
 	min-width: 0;
-	padding: 10px 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-s);
-	background: var(--background-primary-alt);
 }
 
 .wb-skill-row.is-attention {
-	border-color: var(--text-warning, var(--background-modifier-border));
+	box-shadow: inset 3px 0 0 var(--text-warning, var(--background-modifier-border));
 }
 
 .wb-skill-row .setting-item-info,
@@ -2446,15 +2454,17 @@
 	width: 100%;
 }
 
-/* The dropdown: floats under the box while it has focus, one plain row per provider. */
+/*
+ * The list: opens under the box while it has focus, one plain row per
+ * provider. It sits in normal flow rather than floating: the modal body
+ * scrolls its own overflow, so a floated list was clipped to a single row
+ * with a scrollbar of its own. In the picker step the dialog holds nothing
+ * else, so letting it grow costs nothing.
+ */
 .wb-provider-list {
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: calc(100% + 4px);
-	z-index: var(--layer-menu, 20);
 	display: flex;
 	flex-direction: column;
+	margin-top: 4px;
 	padding: 4px;
 	max-height: 320px;
 	overflow-y: auto;

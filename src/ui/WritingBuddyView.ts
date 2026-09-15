@@ -26,6 +26,7 @@
 
 import { ItemView, Notice, type Editor, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
+import { displayTitle } from "../session/titles";
 
 import type WritingBuddyPlugin from "../main";
 import type {
@@ -395,7 +396,7 @@ export class WritingBuddyView extends ItemView {
 		});
 
 		renderSessionBar(container, {
-			title: session ? session.title : null,
+			title: session ? displayTitle(session.title) : null,
 			conversationCount: sessions.count,
 			canRegenerate: Boolean(session && session.messages.length > 0) && !foregroundBusy,
 			onRename: (next) => void this.renameActiveSession(next),
@@ -827,7 +828,7 @@ export class WritingBuddyView extends ItemView {
 				return true;
 			},
 			onDelete: async (session) => {
-				if (!(await confirmDelete(this.app, session.title, session.messages.length))) {
+				if (!(await confirmDelete(this.app, displayTitle(session.title), session.messages.length))) {
 					return false;
 				}
 				await this.plugin.sessions.deleteSession(session.id);
@@ -840,7 +841,7 @@ export class WritingBuddyView extends ItemView {
 				this.plugin.conversationChanged();
 				this.plugin.rememberActiveSession();
 				this.render();
-				new Notice(t("view.deletedSession", { title: session.title }));
+				new Notice(t("view.deletedSession", { title: displayTitle(session.title) }));
 				return true;
 			},
 		});

@@ -24,6 +24,7 @@
 
 import { Modal, type App } from "obsidian";
 import { t } from "../i18n";
+import { displayTitle } from "../session/titles";
 import type { ConversationSession } from "../types";
 import {
 	HISTORY_PAGE_SIZE,
@@ -276,16 +277,16 @@ export class HistoryModal extends Modal {
 
 		const open = row.createEl("button", {
 			cls: "wb-history-open",
-			attr: { type: "button", "aria-label": t("history.openSession", { title: session.title }) },
+			attr: { type: "button", "aria-label": t("history.openSession", { title: displayTitle(session.title) }) },
 		});
 
 		const line = open.createDiv({ cls: "wb-history-line" });
 		const name = line.createSpan({ cls: "wb-history-name" });
-		renderHighlighted(name, session.title, this.query);
+		renderHighlighted(name, displayTitle(session.title), this.query);
 		// A native title, and only the conversation's name: the row already
 		// shows its time and counts, and a heavy dark panel repeating them on
 		// every hover made the list unusable to move through.
-		name.title = session.title;
+		name.title = displayTitle(session.title);
 
 		line.createSpan({ cls: "wb-history-meta", text: describeSession(session, node) });
 

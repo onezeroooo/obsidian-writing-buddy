@@ -48,7 +48,8 @@ export type ExternalSessionChangeResult =
 			external: ConversationSession | null;
 		};
 
-export const UNTITLED = "未命名对话";
+export { UNTITLED, displayTitle } from "./titles";
+import { UNTITLED } from "./titles";
 /** A management threshold, not a hard cap. New conversations remain allowed. */
 export const SESSION_RECOMMENDED_LIMIT = 500;
 

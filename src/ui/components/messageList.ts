@@ -28,6 +28,7 @@
  */
 
 import { t } from "../../i18n";
+import { displayTitle } from "../../session/titles";
 import type { ConversationMessage, ConversationSession, SelectionAttachment } from "../../types";
 import { ICONS, iconSpan } from "../icons";
 import { type ActivityDetails, renderActivityDisclosure, replyTimeLabel } from "./activity";
@@ -248,7 +249,8 @@ function renderBranchMarker(
 
 	const list = marker.createDiv({ cls: "wb-branch-list" });
 	for (const branch of branches) {
-		link(list, ICONS.branch, branch.title, t("msgList.openBranch", { title: branch.title }), () => onOpenSession(branch.id));
+		const title = displayTitle(branch.title);
+		link(list, ICONS.branch, title, t("msgList.openBranch", { title }), () => onOpenSession(branch.id));
 	}
 }
 
@@ -272,8 +274,8 @@ function renderParentMarker(
 	link(
 		list,
 		ICONS.parent,
-		t("msgList.parentSession", { title: parentSession.title }),
-		t("msgList.backToParent", { title: parentSession.title }),
+		t("msgList.parentSession", { title: displayTitle(parentSession.title) }),
+		t("msgList.backToParent", { title: displayTitle(parentSession.title) }),
 		() => onOpenSession(parentSession.id),
 	);
 }

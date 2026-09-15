@@ -202,9 +202,10 @@ export function buildEvidence(context: AssembledContext): EvidenceItem[] {
 	if (context.selection && (context.selection.before || context.selection.after)) {
 		const name = fileName(context.selection.filePath);
 		const parts: string[] = [];
-		if (context.selection.before) parts.push(`【选区前文】
+		const en = instructionLocale() === "en";
+		if (context.selection.before) parts.push(`${en ? "[Before the selection]" : "【选区前文】"}
 ${context.selection.before}`);
-		if (context.selection.after) parts.push(`【选区后文】
+		if (context.selection.after) parts.push(`${en ? "[After the selection]" : "【选区后文】"}
 ${context.selection.after}`);
 		take({
 			path: context.selection.filePath,
@@ -434,6 +435,9 @@ export function evidenceDocumentPayloads(items: EvidenceItem[]): ContextDocument
 			? annotateWithCitationBlocks(item.excerpt, item.citationBlocks)
 			: item.excerpt;
 		return {
+			// The full-width parentheses are the label grammar `safePath.ts`
+			// verifies before anything is sent, so they stay in both languages;
+			// only the kind inside them follows the instruction locale.
 			path: `[${item.id}] ${item.path}${item.heading ? ` · ${item.heading}` : ""}（${evidenceKindLabel(item.kind, instructionLocale())}）`,
 			text: item.truncated ? [body, truncationNote(item, body)].join(String.fromCharCode(10)) : body,
 		};
@@ -450,9 +454,12 @@ export function evidenceDocumentPayloads(items: EvidenceItem[]): ContextDocument
 function truncationNote(item: EvidenceItem, body: string): string {
 	const shown = countChars(body);
 	const total = item.sourceChars;
-	if (total === undefined || total <= 0 || shown >= total) return "（本段为相关节选）";
+	const en = instructionLocale() === "en";
+	if (total === undefined || total <= 0 || shown >= total) return en ? "(This is a relevant excerpt.)" : "（本段为相关节选）";
 	const percent = Math.max(1, Math.round((shown / total) * 100));
-	return `（本段为相关节选，约 ${shown} 字，占原文 ${total} 字的 ${percent}%）`;
+	return en
+		? `(This is a relevant excerpt of about ${shown} characters, ${percent}% of the ${total}-character source.)`
+		: `（本段为相关节选，约 ${shown} 字，占原文 ${total} 字的 ${percent}%）`;
 }
 
 function fileName(path: string): string {

@@ -1,5 +1,6 @@
 import type { RewritePayload, TurnPayload } from "./AIBackend";
 import { renderDocumentsBlock } from "../context/serialize";
+import { instructionLocale } from "../i18n";
 import { snapshotSafeTurnPayloadPaths } from "./safePath";
 
 export interface AdapterMessage {
@@ -51,7 +52,10 @@ export function adapterMessages(payload: TurnPayload): AdapterMessage[] {
 		document.text === selectionText && document.path.includes(selectionFilePath),
 	);
 	if (selection && selectionFilePath !== undefined && !selectionInDocuments) {
-		additions.push("当前选区（" + selectionFilePath + "）：\n" + selectionText);
+		const label = instructionLocale() === "en"
+			? "Current selection (" + selectionFilePath + "):\n"
+			: "当前选区（" + selectionFilePath + "）：\n";
+		additions.push(label + selectionText);
 	}
 	if (additions.length === 0) return messages;
 	const last = messages[messages.length - 1];

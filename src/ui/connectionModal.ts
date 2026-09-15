@@ -81,8 +81,8 @@ export class ConnectionModal extends Modal {
 	 *
 	 * One search box with a dropdown: focusing it lists every provider,
 	 * typing narrows the list, the arrow keys move the highlight, Enter or a
-	 * click chooses. The list floats under the box rather than growing the
-	 * dialog.
+	 * click chooses. The list opens under the box in normal flow: the modal
+	 * body scrolls its own overflow, which clipped a floated list to one row.
 	 */
 	private renderPicker(parent: HTMLElement): void {
 		parent.createEl("h2", { text: t("settings.connections.add") });

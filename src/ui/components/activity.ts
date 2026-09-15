@@ -4,18 +4,12 @@
  * The live state is driven by **events that actually arrived**, in this order:
  *
  *   nothing yet                  →  准备中…
- *   `provider.selected`          →  Codex 处理中…
- *   an `activity` event          →  whatever the Runtime said it is doing
+ *   `provider.selected`          →  selected provider is processing
+ *   an `activity` event          →  reported activity
  *   the first `content.delta`    →  生成中…
  *
- * Every one of those is a fact about the stream, not a claim about the model's
- * mind. The Runtime's V2 chat stream was probed directly (see
- * `internal/tools/probe-activity.mjs`): it emits `request.started`,
- * `provider.selected`, `content.delta`, `usage`, `result`, `done`, and — under
- * client-owned context — no `activity` and no reasoning content, because it has
- * nothing left to retrieve on our behalf. The `activity` branch stays because
- * the Runtime does emit those in other modes, and dropping real information
- * would be worse than carrying an unused case.
+ * Each label describes an observed stream event. Providers need not emit every
+ * event type; absent activity or reasoning content must never be invented.
  *
  * What it must never do is fill the gap with invented stages. A plausible list
  * of things the model is "doing" is indistinguishable from a true one, so it

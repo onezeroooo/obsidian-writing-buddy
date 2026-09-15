@@ -21,6 +21,20 @@
 
 import { truncateChars } from "../util/text";
 import type { SelectionAttachment } from "../types";
+import { instructionLocale, t } from "../i18n";
+
+/**
+ * The stored sentinel for a conversation that has not been named yet.
+ *
+ * It is a value in synced project data, so it never changes with the
+ * interface language; `displayTitle` turns it into the reader's words.
+ */
+export const UNTITLED = "未命名对话";
+
+/** What to show for a title: the sentinel becomes a localized placeholder. */
+export function displayTitle(title: string): string {
+	return title === UNTITLED ? t("session.untitled") : title;
+}
 
 /** Target length. Longer than a chat app's, short of a sentence. */
 export const TITLE_TARGET_CHARS = 24;
@@ -147,39 +161,59 @@ export function titlePrompt(input: {
 	heading?: string | null;
 	fileName?: string | null;
 }): string {
+	const en = instructionLocale() === "en";
 	const where = [
-		input.fileName ? `文件：${chapterName(input.fileName)}` : "",
-		input.heading ? `章节：${input.heading}` : "",
+		input.fileName ? `${en ? "File" : "文件"}：${chapterName(input.fileName)}` : "",
+		input.heading ? `${en ? "Section" : "章节"}：${input.heading}` : "",
 	].filter((part) => part.length > 0);
 
 	const transcript = input.turns.map(
 		(turn) =>
-			`${turn.role === "user" ? "作者" : "助手"}：${truncateChars(
+			`${turn.role === "user" ? (en ? "Writer" : "作者") : (en ? "Assistant" : "助手")}：${truncateChars(
 				turn.text.replace(/\s+/g, " ").trim(),
 				turn.role === "user" ? 220 : 320,
 			)}`,
 	);
 
-	return [
-		input.branched
-			? "下面是一个分支对话最近的几轮内容。给这个分支起一个标题。"
-			: "下面是一段写作对话最近的几轮内容。给这段对话起一个标题。",
-		"",
-		...where,
-		"",
-		...transcript,
-		"",
-		input.branched
-			? "这个分支是从另一段对话中分出来的，请只根据上面这些内容命名，突出它和原对话不同的地方。"
-			: "请根据上面这些内容命名，体现现在主要在讨论什么。",
-		// The chapter is prepended afterwards, so asking for it here as well
-		// produced `第05章追问中林昭克制感扩写` — the same information twice, run
-		// together, with no room left for the actual subject.
-		`要求：中文，8 到 16 个字，一行，只说这段对话在讨论什么。`,
-		"不要写章节名或文件名，那部分会自动加在前面。",
-		"不要加引号、书名号或标点结尾，不要写成一句总结。",
-		"只输出标题本身。",
-	].join("\n");
+	// The chapter is prepended afterwards, so asking for it here as well
+	// produced `第05章追问中林昭克制感扩写` — the same information twice, run
+	// together, with no room left for the actual subject.
+	const lines = en
+		? [
+				input.branched
+					? "Below are the most recent turns of a branch of a writing conversation. Give this branch a title."
+					: "Below are the most recent turns of a writing conversation. Give the conversation a title.",
+				"",
+				...where,
+				"",
+				...transcript,
+				"",
+				input.branched
+					? "This branch split off from another conversation. Name it from the turns above only, and bring out what makes it different from the conversation it left."
+					: "Name it from the turns above, reflecting what is mainly being discussed now.",
+				"Requirements: English, 3 to 6 words, one line, only what this conversation is about.",
+				"Do not include the chapter or file name; that is added in front automatically.",
+				"No quotation marks, no trailing punctuation, not a full sentence.",
+				"Output the title only.",
+			]
+		: [
+				input.branched
+					? "下面是一个分支对话最近的几轮内容。给这个分支起一个标题。"
+					: "下面是一段写作对话最近的几轮内容。给这段对话起一个标题。",
+				"",
+				...where,
+				"",
+				...transcript,
+				"",
+				input.branched
+					? "这个分支是从另一段对话中分出来的，请只根据上面这些内容命名，突出它和原对话不同的地方。"
+					: "请根据上面这些内容命名，体现现在主要在讨论什么。",
+				"要求：中文，8 到 16 个字，一行，只说这段对话在讨论什么。",
+				"不要写章节名或文件名，那部分会自动加在前面。",
+				"不要加引号、书名号或标点结尾，不要写成一句总结。",
+				"只输出标题本身。",
+			];
+	return lines.join("\n");
 }
 
 /**

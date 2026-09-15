@@ -21,6 +21,7 @@ import type {
 	ContextSourceSnapshot,
 } from "../types";
 import { countChars, previewOf } from "../util/text";
+import { UNTITLED } from "../session/titles";
 import { parseFullCorpusCoverage } from "../context/FullCorpusContext";
 import { executionIdentity } from "../util/executionIdentity";
 import { contentRevision, isContentRevision } from "../context/revision";
@@ -180,7 +181,7 @@ export function validateSession(decoded: unknown): ParseResult<ConversationSessi
 	const session: ConversationSession = {
 		schemaVersion: CONVERSATION_SCHEMA_VERSION,
 		id,
-		title: str(record.title) ?? "未命名对话",
+		title: str(record.title) ?? UNTITLED,
 		titleIsManual: record.titleIsManual === true,
 		createdAt,
 		updatedAt: str(record.updatedAt) ?? createdAt,
