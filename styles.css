@@ -609,6 +609,7 @@
 	line-height: 1.7;
 	font-size: var(--wb-font-meta);
 }
+.wb-empty-action { margin-top: 14px; }
 
 /* -------------------------------------------------------------- message */
 
@@ -2134,6 +2135,10 @@
 	padding-bottom: 6px;
 }
 
+/* A heading that folds what is under it: the whole row is the handle. */
+.wb-collapsible-heading { cursor: pointer; user-select: none; }
+.wb-collapsible-heading .setting-item-control { flex: 0 0 auto; }
+
 .wb-skill-list {
 	display: flex;
 	flex-direction: column;
@@ -2400,6 +2405,7 @@
 	width: auto;
 	max-width: 100%;
 	min-width: 0;
+	overflow: visible;
 }
 
 .wb-connection-modal .setting-item {
@@ -2434,37 +2440,40 @@
 
 .wb-connection-modal-status:empty { display: none; }
 
+.wb-provider-field { position: relative; }
+
 .wb-provider-search {
 	width: 100%;
-	margin-bottom: 8px;
 }
 
+/* The dropdown: floats under the box while it has focus, one plain row per provider. */
 .wb-provider-list {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: calc(100% + 4px);
+	z-index: var(--layer-menu, 20);
 	display: flex;
 	flex-direction: column;
-	max-height: 60vh;
+	padding: 4px;
+	max-height: 320px;
 	overflow-y: auto;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
 }
 
-.wb-provider-group {
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	padding: 10px 6px 4px;
-}
+.wb-provider-list.is-empty { display: none; }
 
 .wb-provider-row {
-	text-align: left;
-	justify-content: flex-start;
-	box-shadow: none;
-	background: transparent;
-	padding: 6px 8px;
+	padding: 6px 10px;
 	border-radius: var(--radius-s);
+	cursor: pointer;
 }
 
 .wb-provider-row:hover,
-.wb-provider-row:focus-visible { background: var(--background-modifier-hover); }
+.wb-provider-row.is-active { background: var(--background-modifier-hover); }
 
 .wb-provider-empty {
 	color: var(--text-muted);

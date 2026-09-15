@@ -3,7 +3,7 @@
 	"name": "Writing Buddy",
 	"version": "0.1.0",
 	"minAppVersion": "1.4.5",
-	"description": "Chat about selected text, generate rewrites, and review changes before they reach your manuscript.",
+	"description": "Long-form AI writing in Obsidian with manuscript context, reviewable edits, writing skills, and bring-your-own models.",
 	"author": "onezeroooo",
 	"authorUrl": "https://github.com/onezeroooo",
 	"isDesktopOnly": false

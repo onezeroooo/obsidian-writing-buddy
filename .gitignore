@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+main.js
+dist/
+dist-sideload/
+*.js.map
+
+# local machine / secret material — never commit
+.wb-deploy.json
+.env
+.env.*
+*.local
+device-settings.json
+secrets.json
+*.pem
+*.key
+
+# editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# test vault artifacts and manuscripts must never enter this repo
+test-vault/
+vaults/
+*.vault/
+
+# coverage / temp
+coverage/
+.tmp/

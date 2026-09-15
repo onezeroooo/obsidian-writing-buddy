@@ -1,0 +1,35 @@
+{
+	"name": "obsidian-writing-buddy",
+	"version": "0.1.0",
+	"description": "WritingBuddy / 墨伴 — a writing-first AI workspace inside Obsidian.",
+	"main": "main.js",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"dev": "node esbuild.config.mjs",
+		"typecheck": "tsc -noEmit -skipLibCheck",
+		"smoke": "npm run build && node scripts/smoke-bundle.mjs"
+	},
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"writing",
+		"ai"
+	],
+	"author": "onezeroooo",
+	"license": "MIT",
+	"engines": {
+		"node": ">=20.19.0"
+	},
+	"devDependencies": {
+		"@codemirror/state": "6.5.0",
+		"@codemirror/view": "6.38.6",
+		"@types/node": "^20.19.0",
+		"esbuild": "0.25.5",
+		"obsidian": "1.13.1",
+		"tslib": "2.4.0",
+		"typescript": "^5.8.3",
+		"vitest": "4.1.11"
+	}
+}

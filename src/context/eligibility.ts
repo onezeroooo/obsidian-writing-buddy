@@ -1,0 +1,103 @@
+/**
+ * One policy for deciding which Vault files may become manuscript evidence.
+ *
+ * Candidate discovery, bounded research, and full-manuscript snapshots all use
+ * this module. Keeping the path and frontmatter rules here prevents a broad
+ * workflow from accidentally reading WritingBuddy's own state or an archived
+ * draft that the ordinary context path would have rejected.
+ */
+
+import { CACHE_DIR, MEMORY_DIR, PROJECT_ROOT } from "../storage/paths";
+
+export type ContextCorpusScope = "bounded" | "full-current-manuscript";
+
+export interface ContextEligibilityOptions {
+	/** Historical/discarded material is opt-in for bounded comparison tasks. */
+	includeArchives?: boolean;
+	/** Full-corpus scans are restricted to this already-resolved manuscript root. */
+	root?: string;
+	/** Kept in the shared contract for callers that bind policy to an editor. */
+	activeFilePath?: string | null;
+	scope?: ContextCorpusScope;
+}
+
+const MEMORY_PREFIX = `${MEMORY_DIR}/`;
+const INTERNAL_ROOTS = [PROJECT_ROOT, CACHE_DIR, "_WritingBuddy", ".writing-buddy", ".obsidian"] as const;
+
+/** True for plugin-owned state. Bounded retrieval admits only curated memory. */
+export function isInternalContextPath(path: string): boolean {
+	const normalised = normaliseVaultPath(path);
+	return INTERNAL_ROOTS.some((root) => normalised === root || normalised.startsWith(`${root}/`));
+}
+
+/** Explicit history/discard markers. Plain `草稿` / `draft` remain current work. */
+export function isExplicitArchivePath(path: string): boolean {
+	return normaliseVaultPath(path).split("/").some((segment) =>
+		/(?:旧稿|旧版|修改稿|弃稿|废稿|作废|存档|归档|历史版本|备份|冲突副本)/iu.test(segment) ||
+		/(?:^|[\s._\-])(archives?|archived|discarded|deprecated|backup|backups|old[\s._\-]*(?:drafts?|versions?)|conflicted?[\s._\-]*cop(?:y|ies))(?:$|[\s._\-])/iu.test(segment),
+	);
+}
+
+/** Frontmatter can make an otherwise ordinary path explicitly historical. */
+export function hasExplicitArchiveMetadata(text: string): boolean {
+	const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text);
+	if (!match) return false;
+	const frontmatter = match[1];
+	if (/^(?:writingBuddyStatus|status|versionStatus|draftStatus)\s*:\s*(?:archive|archived|discarded|deprecated|old(?:[ _-]+version)?|backup|旧稿|旧版|修改稿|弃稿|废稿|作废|存档|存档参照|归档|历史版本|备份|冲突副本)\s*$/imu.test(frontmatter)) {
+		return true;
+	}
+	const lines = frontmatter.split(/\r?\n/u);
+	for (let index = 0; index < lines.length; index += 1) {
+		const inlineTags = /^(?:tags?)\s*:\s*(.*)$/iu.exec(lines[index]);
+		if (!inlineTags) continue;
+		if (hasArchiveTag(inlineTags[1])) return true;
+		for (let child = index + 1; child < lines.length && /^\s+-/u.test(lines[child]); child += 1) {
+			if (hasArchiveTag(lines[child].replace(/^\s*-\s*/u, ""))) return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Path-only eligibility. Metadata is checked after the bounded read by callers.
+ * The active file is not excluded: callers may need it even when their inventory
+ * lags, and candidate-level duplicate suppression is a separate concern.
+ */
+export function isEligibleContextPath(path: string, options: ContextEligibilityOptions = {}): boolean {
+	if (/[\\\u0000-\u001f\u007f-\u009f]/u.test(path) || path.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(path)) return false;
+	const normalised = normaliseVaultPath(path);
+	if (!isSafeVaultRelativePath(normalised) || !/\.md$/iu.test(normalised)) return false;
+
+	const scope = options.scope ?? (options.root !== undefined ? "full-current-manuscript" : "bounded");
+	if (scope === "full-current-manuscript") {
+		if (isInternalContextPath(normalised)) return false;
+		if (options.root !== undefined && !isWithinContextRoot(normalised, normaliseVaultPath(options.root))) return false;
+	} else if (isInternalContextPath(normalised) && !normalised.startsWith(MEMORY_PREFIX)) {
+		return false;
+	}
+
+	return options.includeArchives === true || !isExplicitArchivePath(normalised);
+}
+
+export function normaliseVaultPath(path: string): string {
+	return path.replace(/\\/gu, "/").replace(/^\.\//u, "").replace(/^\/+|\/+$/gu, "");
+}
+
+export function isWithinContextRoot(path: string, root: string): boolean {
+	// A root-level active file means other root-level Markdown files, not the
+	// entire recursive Vault. This is a manuscript boundary, not a permission.
+	return root.length === 0 ? !path.includes("/") : path === root || path.startsWith(`${root}/`);
+}
+
+function hasArchiveTag(value: string): boolean {
+	const tags = value.replace(/^\[|\]$/gu, "").split(/[\s,]+/u).map((tag) =>
+		tag.trim().replace(/^['"]|['"]$/gu, "").replace(/^#/u, ""),
+	).filter(Boolean);
+	return tags.some((tag) => /^(?:archive|archived|discarded|deprecated|old(?:[ _-]+version)?|backup|旧稿|旧版|修改稿|弃稿|废稿|作废|存档|存档参照|归档|历史版本|备份|冲突副本)$/iu.test(tag));
+}
+
+function isSafeVaultRelativePath(value: string): boolean {
+	if (value.length === 0 || value.trim() !== value) return false;
+	if (/[\u0000-\u001f\u007f-\u009f]/u.test(value) || value.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return false;
+	return value.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+}

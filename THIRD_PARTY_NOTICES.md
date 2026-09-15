@@ -2,25 +2,23 @@
 
 ## Runtime and bundled code
 
-WritingBuddy ships **no third-party source code** in its bundle. `main.js` is
-built exclusively from the TypeScript sources under `src/`. Every dependency in
-`package.json` is a `devDependency` (build tooling, type definitions, test
-runner) and none of them are bundled into the released artifact.
+Writing Buddy vendors or bundles **no third-party source code** into its released `main.js`. The bundle is built from the TypeScript sources under `src/`. Dependencies in `package.json` are development tooling, type definitions, test tooling, or APIs supplied externally by Obsidian at runtime.
 
 | Dependency | Role | License |
 | --- | --- | --- |
-| `esbuild` | bundles `src/` into `main.js` | MIT |
-| `typescript` | type-checking only | Apache-2.0 |
-| `vitest` | test runner | MIT |
-| `obsidian` | API type definitions only (`external` at build time) | MIT |
-| `@types/node` | type definitions only | MIT |
-| `tslib` | TypeScript helper library (unused at `importHelpers: false`) | 0BSD |
+| `esbuild` | Bundles `src/` into `main.js` | MIT |
+| `typescript` | Type checking | Apache-2.0 |
+| `vitest` | Test runner used in the private development workspace | MIT |
+| `obsidian` | Obsidian API package; external at build time | MIT |
+| `@codemirror/state` | Editor API used through Obsidian; external at build time | MIT |
+| `@codemirror/view` | Editor API used through Obsidian; external at build time | MIT |
+| `@types/node` | Type definitions | MIT |
+| `tslib` | TypeScript helper library; not imported with `importHelpers: false` | 0BSD |
 
 ## Copied source code
 
-**None.** No file in this repository was copied from another project.
+**None.** No source file in Writing Buddy was copied from another project.
 
 ## Attribution obligations
 
-No code was copied into this repository, so WritingBuddy carries no attribution
-obligation beyond the dependency licences listed above.
+Writing Buddy does not vendor third-party source. The dependency licenses above remain the licenses of their respective projects.

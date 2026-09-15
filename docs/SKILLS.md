@@ -1,5 +1,7 @@
 # Skills
 
+English | [简体中文](SKILLS.zh-CN.md)
+
 A Skill names one writing task. It does not own product safety, source handling,
 citation syntax, or rewrite-envelope formatting; Writing Buddy composes those
 shared rules separately for every turn. This keeps a Skill small enough to
@@ -16,11 +18,11 @@ There are three active Skill classes:
 | User-created | `WritingBuddy/skills/custom/<id>.md` | Yes | Independent of built-in releases |
 
 A clean install writes no built-in Markdown into the Vault. In **Settings >
-墨伴 > 指令与技能**, **查看内置** shows the packaged task instructions
-read-only. **编辑我的自定义** saves only an additive writer-owned requirement.
-**重置自定义** deletes only that one addition; it never overwrites the built-in
-or another custom Skill. **+ 新建技能** opens a structured editor for a
-user-created Skill.
+Writing Buddy > Instructions and skills**, **View built-in** shows the packaged
+task instructions read-only. **Edit my customization** saves only an additive
+writer-owned requirement. **Reset customization** deletes only that one
+addition; it never overwrites the built-in or another custom Skill. **+ New
+skill** opens a structured editor for a user-created Skill.
 
 The active layout is:
 
@@ -51,14 +53,14 @@ edited legacy file.
 
 | Skill id | Name | Classification | Action | Scope |
 | --- | --- | --- | --- | --- |
-| `rewrite` | 改写 | writing | `rewrite` | selection |
-| `polish` | 润色 | writing | `rewrite` | selection |
-| `shorten` | 精简 | writing | `rewrite` | selection |
-| `expand` | 扩写 | writing | `rewrite` | selection |
-| `continue` | 续写 | writing | `continue` | selection |
-| `scene-polish` | 场景打磨 | writing | `rewrite` | selection |
-| `pacing` | 节奏诊断 | review | `chat` | selection |
-| `consistency` | 一致性检查 | review | `chat` | project |
+| `rewrite` | Rewrite | writing | `rewrite` | selection |
+| `polish` | Polish | writing | `rewrite` | selection |
+| `shorten` | Tighten | writing | `rewrite` | selection |
+| `expand` | Expand | writing | `rewrite` | selection |
+| `continue` | Continue | writing | `continue` | selection |
+| `scene-polish` | Scene polish | writing | `rewrite` | selection |
+| `pacing` | Pacing check | review | `chat` | selection |
+| `consistency` | Consistency check | review | `chat` | project |
 
 `scene-polish` absorbed `show-not-tell`, `dialogue` and `transition`; it decides
 from the request, the selection and the context which of those a passage
@@ -121,10 +123,10 @@ candidates. Precedence is:
 
 This is not raw substring routing. The router considers the action type, scope,
 declared phrases, imperative/question shape, edit negation, and whether a
-selection exists. “不要改写，只解释为什么” and “为什么这里要改写？” remain
-ordinary chat. A selection-only action cannot run without a selection. A short,
-unambiguous imperative follow-up such as “再克制一点” may keep the preceding
-rewrite Skill. If several candidates survive, the longest phrase wins and stable
+selection exists. “Don't rewrite it, just explain why” and “Why does this need
+a rewrite?” remain ordinary chat. A selection-only action cannot run without a
+selection. A short, unambiguous imperative follow-up such as “a little more
+restrained” may keep the preceding rewrite Skill. If several candidates survive, the longest phrase wins and stable
 Skill order breaks a tie. Latin phrases require token-like boundaries; CJK
 phrases use natural containment.
 
@@ -140,19 +142,19 @@ also intentionally readable and editable:
 ```markdown
 ---
 id: scene-tension
-name: 场景张力检查
+name: Scene tension check
 action: chat
 scope: selection
 version: 1
-description: 找出张力松掉的位置。
-composerPrompt: 帮我检查这一段的场景张力
-routing: 检查张力、场景太平
+description: Find where the tension goes slack.
+composerPrompt: Check the scene tension in this passage
+routing: check tension, scene feels flat
 routingAllowQuestions: true
 instructionProfile: review
 ---
 
-检查这一场景的目标、阻力和转折。
-指出具体位置以及张力为何减弱。
+Examine this scene's goal, resistance, and turning point.
+Point to the exact places where the tension weakens and explain why.
 ```
 
 Frontmatter is a small flat `key: value` format. Recognized fields are:
@@ -184,7 +186,7 @@ values, or hashes are rejected. The Markdown body must be non-empty.
 - `rewrite` produces a replacement candidate for the exact captured selection.
 - `continue` produces new prose to insert after the captured selection.
 
-Both writing actions remain candidates until the writer presses **应用** and
+Both writing actions remain candidates until the writer presses **Apply** and
 the exact-range freshness check passes. A Skill cannot select a Connection,
 Provider, Model, Effort, file path, shell command, tool, or permission level.
 
