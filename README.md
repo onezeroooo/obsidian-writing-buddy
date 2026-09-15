@@ -19,15 +19,15 @@ Bring your own model. Every generated edit stays a candidate until you choose **
 
 ![A selected passage alongside a proposed rewrite, highlighted differences, and the Apply button](docs/screenshots/01-rewrite-review.png)
 
-*From selection to suggestion to review, without leaving the manuscript.*
+<p align="center"><em>From selection to suggestion to review, without leaving the manuscript.</em></p>
 
 <p align="center">
 <a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers"><img src="https://img.shields.io/github/stars/onezeroooo/obsidian-writing-buddy?style=for-the-badge&logo=github&label=Star%20on%20GitHub" alt="Star Writing Buddy on GitHub"></a>
-&nbsp;
+&nbsp;&nbsp;
 <a href="https://ko-fi.com/onezeroooo"><img src="https://ko-fi.com/img/githubbutton_sm.svg" height="28" alt="Support onezeroooo on Ko-fi"></a>
 </p>
 
-<p align="center"><sub>Writing Buddy is free and open source. Support is entirely optional.</sub></p>
+<p align="center"><sub>Writing Buddy is free and open source. <a href="https://community.obsidian.md/plugins/writing-buddy">View it on Obsidian Community</a>. If it helps your writing, <a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers">give it a star on GitHub</a> or <a href="https://ko-fi.com/onezeroooo">support its upkeep on Ko-fi</a>. Both are entirely optional.</sub></p>
 
 ## Built for long-form writing
 
@@ -113,7 +113,7 @@ The provider or endpoint you choose has its own privacy and data policies.
 
 ## Quick Start
 
-**Community listing is not yet available.** The steps below apply once Writing Buddy is accepted into the directory. The [GitHub release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) contains the plugin files and release notes.
+Writing Buddy is published in the [Obsidian Community directory](https://community.obsidian.md/plugins/writing-buddy). If it has not appeared in in-app search yet, the directory index may still be propagating. The [GitHub release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) contains the same plugin files and release notes.
 
 1. Open **Settings → Community plugins → Browse** in Obsidian.
 2. Search for **Writing Buddy** and install it.
@@ -121,7 +121,7 @@ The provider or endpoint you choose has its own privacy and data policies.
 4. Add an AI connection under **Settings → Writing Buddy → AI Connections**.
 5. Open a note and start from the manuscript.
 
-Updates will arrive through Community plugins once the listing is available.
+Once the listing appears in your client, future updates arrive through Community plugins.
 
 After setup, select a passage and try: *“Make this more restrained. Keep the disappointment clear without explaining it directly.”* Review the differences, then apply the version you want to keep.
 

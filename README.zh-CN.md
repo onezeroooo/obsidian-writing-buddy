@@ -19,15 +19,15 @@
 
 ![中文稿件选区、改写要求与逐字差异预览，应用按钮清晰可见](docs/screenshots/08b-rewrite-review-zh-prompt.png)
 
-*选中正文，说明想怎么改，再决定留下哪些变化。*
+<p align="center"><em>选中正文，说明想怎么改，再决定留下哪些变化。</em></p>
 
 <p align="center">
 <a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers"><img src="https://img.shields.io/github/stars/onezeroooo/obsidian-writing-buddy?style=for-the-badge&logo=github&label=Star%20on%20GitHub" alt="在 GitHub 给 Writing Buddy 点 Star"></a>
-&nbsp;
+&nbsp;&nbsp;
 <a href="https://ko-fi.com/onezeroooo"><img src="https://ko-fi.com/img/githubbutton_sm.svg" height="28" alt="在 Ko-fi 支持 onezeroooo"></a>
 </p>
 
-<p align="center"><sub>Writing Buddy 免费且开源；支持完全自愿。</sub></p>
+<p align="center"><sub>Writing Buddy 免费且开源。<a href="https://community.obsidian.md/plugins/writing-buddy">在 Obsidian Community 查看</a>。如果它让你的写作顺手了一点，欢迎<a href="https://github.com/onezeroooo/obsidian-writing-buddy/stargazers">在 GitHub 点个 Star</a>，也可以<a href="https://ko-fi.com/onezeroooo">通过 Ko-fi 支持后续维护</a>；都完全自愿。</sub></p>
 
 ## 为长篇写作而设计
 
@@ -113,7 +113,7 @@
 
 ## 快速开始
 
-**目前尚未在社区目录上架。** 以下安装步骤适用于审核通过之后。[GitHub Release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) 已提供本版本的插件文件与更新说明。
+Writing Buddy 已发布到 [Obsidian Community 目录](https://community.obsidian.md/plugins/writing-buddy)。如果暂时还无法在客户端搜索到，通常只是目录索引仍在同步。[GitHub Release](https://github.com/onezeroooo/obsidian-writing-buddy/releases/tag/0.1.2) 提供相同的插件文件与更新说明。
 
 1. 在 Obsidian 中打开 **设置 → 第三方插件 → 浏览**。
 2. 搜索 **Writing Buddy** 并安装。
@@ -121,7 +121,7 @@
 4. 到 **设置 → 墨伴 → AI 连接** 添加一个连接。
 5. 打开一篇稿件，直接从正文开始。
 
-上架后，更新将通过 Obsidian 的第三方插件机制提供。
+客户端目录出现后，后续更新会通过 Obsidian 的第三方插件机制提供。
 
 配置好之后，可以选中一段试试：*“把这一段写得更克制一些。保留失望感，但不要直接解释情绪。”* 查看差异，再决定是否应用。
 
