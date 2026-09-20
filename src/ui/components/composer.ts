@@ -26,7 +26,7 @@ import { Menu } from "obsidian";
 import { t } from "../../i18n";
 import type { Capabilities, EffortCapability, ModelCapability } from "../../backend/AIBackend";
 import type { ContextDepth, SelectionAttachment, SessionPreferences, Skill } from "../../types";
-import { SERVER_DEFAULT_EFFORT, isUnroutableEffort, providerDisplayName } from "../../backend/capabilities";
+import { providerDisplayName } from "../../backend/capabilities";
 import { CONTEXT_DEPTHS, contextDepthLabel } from "../../context/types";
 import type { AIConnection, ConnectionHealth } from "../../connections/types";
 import { ICONS, iconButton, iconSpan } from "../icons";
@@ -92,10 +92,9 @@ export interface ParameterValueState {
 	unavailable: boolean;
 }
 
-/** A readable Effort label when only its persisted wire value is available. */
+/** An Effort reads as its wire value: what the row says is what the request carries. */
 export function effortDisplayName(id: string, label?: string): string {
-	if (label && label.trim().length > 0) return label;
-	return id.length > 0 ? id[0].toUpperCase() + id.slice(1) : id;
+	return label && label.trim().length > 0 ? label : id;
 }
 
 /**
@@ -158,18 +157,15 @@ export function parseProviderChoice(value: string): { connectionId: string; prov
 }
 
 /**
- * Every Provider a writer can actually reach, across enabled Connections.
+ * Every place a turn can run, across enabled Connections.
  *
- * The Composer asks which model writes this turn, not which account it is
- * billed to. Making Connection the first choice meant a writer who knew they
- * wanted one Provider had to remember which Connection carried it, and a
- * Connection with nothing enabled behind it still occupied the first slot.
- * Settings keeps Connection identity primary; only this picker is flattened.
- *
- * A Provider name that appears behind more than one Connection is qualified by
- * its Connection, and only then — an unambiguous name needs no explanation. A
- * direct connection names its one Provider after itself ("Tidewire"), so the
- * qualifier is also skipped when it would only repeat the label.
+ * Each entry is a Connection and the Provider behind it. Every Connection the
+ * plugin can make today carries exactly one Provider — a direct connection
+ * names it after itself ("Tidewire"), a local one calls it Local — so the
+ * picker reads as a list of Connections and is labelled as one. The pair is
+ * still what the value encodes, so a Connection that ever carried several
+ * Providers would list each, qualified by the Connection's name; today that
+ * qualifier is skipped because it would only repeat the label.
  */
 export function crossConnectionProviderOptions(
 	connections: readonly AIConnection[],
@@ -218,23 +214,13 @@ export function modelOptions(models: ModelCapability[]): SelectOption[] {
 }
 
 /**
- * Effort choices, on the same terms, plus the one entry that is not a value.
- *
- * The first row used to read `Auto` and carry `"auto"`, which was sent verbatim
- * and answered with `400 unsupported_effort`. It is not an effort the server
- * has; it is the writer declining to pick one, so it carries the empty value
- * and `buildChatBody` omits the field entirely — the same shape `provider`
- * already uses for the same reason.
- *
- * It is offered even when the server advertises no ladder at all, which is the
- * current state of the measured Runtime: with nothing to choose between, "let
- * the server decide" is the only honest thing the row can say.
+ * Effort choices, on the same terms: every row is a value the request will
+ * carry. There is no "server decides" row any more — it meant a different
+ * thing on every provider — and no `auto`; a model that offers a ladder
+ * always has one of its levels selected.
  */
 export function effortOptions(efforts: EffortCapability[]): SelectOption[] {
-	return [
-		{ value: SERVER_DEFAULT_EFFORT, label: t("composer.effortServerDefault") },
-		...efforts.map((effort) => ({ value: effort.id, label: effort.label ?? effort.id })),
-	];
+	return efforts.map((effort) => ({ value: effort.id, label: effort.label ?? effort.id }));
 }
 
 /**
@@ -246,14 +232,14 @@ export function effortOptions(efforts: EffortCapability[]): SelectOption[] {
  */
 export function missingSelections(preferences: SessionPreferences): string[] {
 	const missing: string[] = [];
-	if (!preferences.connectionId) missing.push(t("label.connection"));
-	if (!preferences.provider) missing.push(t("label.provider"));
+	// Connection and Provider are one choice: every Connection carries exactly
+	// one Provider today, and the picker names the Connection. A missing
+	// Provider is therefore a missing Connection, reported once.
+	if (!preferences.connectionId || !preferences.provider) missing.push(t("label.connection"));
 	if (!preferences.model) missing.push(t("label.model"));
-	// Effort is not here. An unset effort is now a choice — the first row of the
-	// dropdown — and it sends no effort field at all, so there is nothing left
-	// for the writer to supply. Requiring it was what made `"auto"` necessary in
-	// the first place: something had to fill the slot, and the only word to hand
-	// was one the server does not accept.
+	// Effort is not here. A model with a ladder always has a level selected —
+	// the default is applied when the model is chosen and again when stored
+	// preferences are read — so there is nothing left for the writer to supply.
 	if (!preferences.contextDepth) missing.push(t("label.context"));
 	return missing;
 }
@@ -267,8 +253,8 @@ export function canSend(
 	 * Retained so the positional call sites keep their meaning, and ignored.
 	 *
 	 * It existed to waive the Effort requirement when the server advertised no
-	 * ladder. There is no requirement to waive now: declining an effort is a
-	 * choice, and it sends no field.
+	 * ladder. There is no requirement to waive now: a model with a ladder
+	 * always carries one of its levels.
 	 */
 	_effortSupported = true,
 	connectionReady = true,
@@ -299,11 +285,10 @@ export function selectionIsAvailable(capabilities: Capabilities, preferences: Se
 	const model = provider?.models.find((item) => item.id === preferences.model);
 	if (!provider || !model) return false;
 	const efforts = model.efforts ?? provider.efforts;
-	// Declining to choose is always valid — it puts no effort on the wire. A
-	// named one has to be named by the server. The old form of this line let
-	// `"auto"` through unconditionally, which is how a value the dropdown could
-	// not offer and the server would not accept stayed valid for months.
-	if (isUnroutableEffort(preferences.effort)) return true;
+	// A model without a ladder ignores effort; a model with one has to be sent
+	// a level it offers. Stored preferences are resolved onto the ladder before
+	// they get here, so a miss means the ladder itself changed underneath.
+	if (efforts.length === 0) return true;
 	return efforts.some((item) => item.id === preferences.effort);
 }
 
@@ -600,7 +585,7 @@ function renderSelectors(parent: HTMLElement, options: ComposerOptions): void {
 	const providerChoices = crossConnectionProviderOptions(options.connections, options.capabilitiesFor);
 	const hasEnabledConnection = options.connections.some((connection) => connection.enabled);
 	param(group, {
-		label: t("label.provider"),
+		label: t("label.connection"),
 		choices: providerChoices,
 		value: options.preferences.connectionId && options.preferences.provider
 			? providerChoiceValue(options.preferences.connectionId, options.preferences.provider)
@@ -629,7 +614,7 @@ function renderSelectors(parent: HTMLElement, options: ComposerOptions): void {
 		value: options.preferences.model,
 		savedLabel: options.preferences.model,
 		choicesAreAuthoritative: capabilitiesKnown,
-		empty: options.preferences.provider ? t("composer.noModels") : t("composer.selectProviderFirst"),
+		empty: options.preferences.provider ? t("composer.noModels") : t("composer.selectConnectionFirst"),
 		onChange: (value) => options.onPreferenceChange({ model: value }),
 	});
 

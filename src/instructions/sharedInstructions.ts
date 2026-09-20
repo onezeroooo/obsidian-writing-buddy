@@ -23,6 +23,8 @@ interface SharedInstructionSet {
 	continueOutput: string;
 	proposal: string;
 	capability: string;
+	/** How a conversational reply is shown, and therefore how it should be written. */
+	presentation: string;
 	/** `{name}` is the pressed action's display name. */
 	pressed: (name: string) => string;
 }
@@ -117,6 +119,11 @@ const ZH: SharedInstructionSet = {
 		"作者可以：在正文中选中段落后向你提问，或使用改写、润色等动作按钮；也可以切换 Full 模式做全稿分析。",
 		"不要声称拥有此外的能力，例如直接修改文件、打开或读取未提供的内容、替作者执行界面操作。",
 	].join("\n"),
+	presentation: [
+		"回答的呈现：",
+		"回答在界面里按纯文本原样显示，不渲染 Markdown。用普通段落和自然的句子组织回答；不要用 # 标题、**加粗**、> 引用块、表格或代码围栏来排版。需要分点时，用「1.」「2.」这样的简单编号即可。",
+		"举例、示范或建议的文字直接写进段落，或用引号标出，不要放进围栏。唯一的例外是本产品另行说明的带标签候选围栏——那是一份可应用的提议，不是排版。",
+	].join("\n"),
 	pressed: (name) => [
 		`本回合作者按下了「${name}」动作按钮，并输入了文字。`,
 		"输入的文字是对这次改动的具体要求，不是新话题；不要只回应上一轮讨论过的内容。",
@@ -174,6 +181,11 @@ const EN: SharedInstructionSet = {
 		"What you can do in this product: answer questions about the manuscript; retrieve project material when needed (bounded); propose rewrite candidates for the author's selected passage — whether to apply is the author's decision in the diff view, and applying is undoable.",
 		"The author can: select a passage in the manuscript and ask you about it, or use action buttons such as Rewrite and Polish; they can also switch to Full mode for whole-manuscript analysis.",
 		"Do not claim abilities beyond these, such as modifying files directly, opening or reading content that was not provided, or operating the interface for the author.",
+	].join("\n"),
+	presentation: [
+		"How the reply is shown:",
+		"The reply is displayed as plain text, exactly as written; Markdown is not rendered. Write in ordinary paragraphs and natural sentences — no # headings, **bold**, > block quotes, tables, or code fences for layout. When points need separating, simple numbering such as \"1.\" and \"2.\" is enough.",
+		"Text offered as an example, illustration, or suggestion goes straight into the paragraph or inside quotation marks, never inside a fence. The one exception is the labelled candidate fence this product describes separately — that is an applicable proposal, not layout.",
 	].join("\n"),
 	pressed: (name) => [
 		`This turn the author pressed the "${name}" action button and typed text.`,
@@ -244,6 +256,11 @@ export function sharedCandidateProposalInstruction(): string {
  */
 export function sharedCapabilityInstruction(): string {
 	return active().capability;
+}
+
+/** How the reply is shown. Sent on every turn whose prose the writer reads, in either language. */
+export function sharedPresentationInstruction(): string {
+	return active().presentation;
 }
 
 /**

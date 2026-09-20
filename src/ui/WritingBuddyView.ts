@@ -107,6 +107,7 @@ import { connectionSnapshot } from "../connections/types";
 import {
 	effectiveComposerPreferences,
 	updateComposerPreferences,
+	withResolvedEffort,
 } from "./composerPreferences";
 import { LOCAL_CONNECTION_CONCURRENCY, deadlineMsFromMinutes } from "../session/fullCorpusLimits";
 import type { EffortCapability, RequestMessage } from "../backend/AIBackend";
@@ -913,12 +914,15 @@ export class WritingBuddyView extends ItemView {
 		const connection = this.plugin.connection(preferences.connectionId);
 		if (!connection) return preferences;
 		const snapshot = connectionSnapshot(connection);
-		return {
+		// Effort lands on the model's ladder here, once, for every reader of the
+		// preferences: the Composer, the send path and the title generator.
+		const efforts = this.plugin.effortsForConnectionProvider(preferences.connectionId, preferences.provider ?? "", preferences.model);
+		return withResolvedEffort({
 			...preferences,
 			connectionName: snapshot.name,
 			connectionType: snapshot.type,
 			...(snapshot.detail ? { connectionDetail: snapshot.detail } : {}),
-		};
+		}, efforts);
 	}
 
 	private async updatePreferences(patch: Partial<SessionPreferences>): Promise<void> {
@@ -2468,17 +2472,17 @@ export function retryExecutionPreferences(
 }
 
 /**
- * Pick the final-synthesis retry effort from the model's advertised ladder.
- * Capability order is the provider's order: concrete levels ascend, while the
- * Composer's synthetic Auto value is not part of this list.
+ * Pick the final-synthesis retry effort from the model's ladder. Capability
+ * order ascends, so the retry is one step down from the selected level; the
+ * lowest level has nowhere to go.
  */
 export function lowerFinalRetryEffort(
 	selected: string | undefined,
 	efforts: readonly EffortCapability[],
 ): string | undefined {
-	const concrete = efforts.map((effort) => effort.id).filter((id) => id !== "auto");
+	const concrete = efforts.map((effort) => effort.id);
 	if (concrete.length === 0) return undefined;
-	if (!selected || selected === "auto") return concrete[0];
+	if (!selected) return concrete[0];
 	const index = concrete.indexOf(selected);
 	return index > 0 ? concrete[index - 1] : undefined;
 }

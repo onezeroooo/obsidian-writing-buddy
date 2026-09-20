@@ -1,5 +1,6 @@
 /** WritingBuddy settings: connections, session defaults, and writer-owned Skills. */
 import { buildLabel } from "../buildInfo";
+import { defaultEffortFor, resolveEffort } from "../backend/effort";
 import { App, Notice, PluginSettingTab, Setting, type SettingDefinition, type SettingDefinitionItem, type SettingGroupItem } from "obsidian";
 import type WritingBuddyPlugin from "../main";
 import { getLocale, t } from "../i18n";
@@ -10,7 +11,7 @@ import { connectionSnapshot, connectionSummary, type ConnectionRecord } from "..
 import { healthLabel } from "./components/header";
 import { SESSION_RECOMMENDED_LIMIT } from "../session/SessionManager";
 import { CONTEXT_DEPTHS, contextDepthLabel } from "../context/types";
-import { providerDisplayName } from "../backend/capabilities";
+import type { Capabilities, ProviderCapability } from "../backend/AIBackend";
 import { routeSkill, type SkillRouteResult } from "../session/skillRouting";
 import { parseSkill } from "../skills/skillParser";
 import type { ContextDepth, SessionPreferences, Skill } from "../types";
@@ -431,24 +432,27 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		for (const spec of this.newConversationDefaultRows()) this.dropdownRow(containerEl, spec);
 	}
 
-	/** Connection → Provider → Model → Effort, each narrowing the next, then Context. */
+	/**
+	 * Connection → Model → Effort, each narrowing the next, then Context.
+	 *
+	 * Provider has no row. Every Connection carries exactly one, so the row
+	 * only ever repeated the Connection's name; it is derived here and stored
+	 * with the Model, and the request contract still carries it.
+	 */
 	private newConversationDefaultRows(): DropdownSpec[] {
 		const defaults = this.plugin.deviceSettings.newConversationDefaults;
 		const enabled = this.plugin.connectionRecords().filter((record) => record.connection.enabled);
 		const capabilities = this.plugin.connectionCapabilities(defaults.connectionId);
-		const provider = capabilities.providers.find((item) => item.id === defaults.provider);
+		const provider = capabilities.providers.find((item) => item.id === defaults.provider) ?? soleProvider(capabilities);
 		const models = provider?.models ?? [];
 		const model = models.find((item) => item.id === defaults.model);
 		const efforts = model?.efforts ?? provider?.efforts ?? [];
 
 		const connectionOptions: Record<string, string> = { "": t("common.unset") };
 		for (const record of enabled) connectionOptions[record.connection.id] = record.connection.name;
-		const providerOptions: Record<string, string> = { "": t("common.unset") };
-		for (const item of capabilities.providers) providerOptions[item.id] = providerDisplayName(item.id, item.label);
 		const modelOptions: Record<string, string> = { "": t("common.unset") };
 		for (const item of models) modelOptions[item.id] = item.label ?? item.id;
-		const effortOptions: Record<string, string> = { "": efforts.length ? t("common.unset") : t("common.unsupported") };
-		if (efforts.length) effortOptions.auto = t("composer.effortServerDefault");
+		const effortOptions: Record<string, string> = efforts.length ? {} : { "": t("common.unsupported") };
 		for (const item of efforts) effortOptions[item.id] = item.label ?? item.id;
 		const contextOptions: Record<string, string> = {};
 		for (const depth of CONTEXT_DEPTHS) contextOptions[depth.id] = contextDepthLabel(depth.id);
@@ -478,36 +482,20 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				},
 			},
 			{
-				key: "defaults.provider",
-				name: t("label.provider"),
-				desc: defaults.connectionId ? t("settings.defaults.providerDesc") : t("settings.defaults.selectConnectionFirst"),
-				options: providerOptions,
-				value: defaults.provider ?? "",
-				disabled: !defaults.connectionId,
-				onChange: async (providerId) => {
-					await this.plugin.setNewConversationDefaults({
-						...this.plugin.deviceSettings.newConversationDefaults,
-						provider: providerId || undefined,
-						model: undefined,
-						effort: undefined,
-					});
-					this.rerender();
-				},
-			},
-			{
 				key: "defaults.model",
 				name: t("label.model"),
-				desc: defaults.provider ? t("settings.defaults.modelDesc") : t("settings.defaults.selectProviderFirst"),
+				desc: defaults.connectionId ? t("settings.defaults.modelDesc") : t("settings.defaults.selectConnectionFirst"),
 				options: modelOptions,
 				value: defaults.model ?? "",
-				disabled: !defaults.provider,
+				disabled: !defaults.connectionId || !provider,
 				onChange: async (modelId) => {
 					const selectedModel = models.find((item) => item.id === modelId);
 					const selectedEfforts = selectedModel?.efforts ?? provider?.efforts ?? [];
 					await this.plugin.setNewConversationDefaults({
 						...this.plugin.deviceSettings.newConversationDefaults,
+						provider: modelId ? provider?.id : undefined,
 						model: modelId || undefined,
-						effort: modelId && selectedEfforts.length > 0 ? "auto" : undefined,
+						effort: modelId ? defaultEffortFor(selectedEfforts) : undefined,
 					});
 					this.rerender();
 				},
@@ -517,7 +505,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				name: t("label.effort"),
 				desc: defaults.model ? (efforts.length ? t("settings.defaults.effortDesc") : t("settings.defaults.effortUnsupported")) : t("settings.defaults.selectModelFirst"),
 				options: effortOptions,
-				value: defaults.effort ?? "",
+				value: resolveEffort(defaults.effort, efforts) ?? "",
 				disabled: !defaults.model || efforts.length === 0,
 				onChange: async (effort) => {
 					await this.plugin.setNewConversationDefaults({
@@ -1025,4 +1013,9 @@ function findScroller(from: HTMLElement): HTMLElement | null {
 		if (node.scrollHeight > node.clientHeight + 1) return node;
 	}
 	return null;
+}
+
+/** The Provider a Connection carries when it carries one, which every Connection does today. */
+function soleProvider(capabilities: Capabilities): ProviderCapability | undefined {
+	return capabilities.providers.length === 1 ? capabilities.providers[0] : undefined;
 }

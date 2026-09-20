@@ -183,7 +183,9 @@ export class RoutingAIBackend implements AIBackend {
 		}
 		this.requests.set(payload.requestId, backend);
 		try {
-			const routed = payload.effort === "auto" ? { ...payload, effort: null } : payload;
+			// A model without a ladder is sent no effort, whatever an older
+			// preference still carries.
+			const routed = offersEffort(this.registry.getCapabilities(payload.connectionId), payload) ? payload : { ...payload, effort: null };
 			const stream = rewrite ? backend.rewrite(routed as RewritePayload) : backend.chat(routed);
 			for await (const event of stream) yield event;
 		} finally {
@@ -203,16 +205,37 @@ function validateSelection(capabilities: Capabilities, payload: TurnPayload): { 
 	const model = provider.models.find((item) => item.id === payload.model);
 	if (!model) return { code: "model_unavailable", message: "所选 Model 不属于这个 Provider。" };
 	const efforts = model.efforts ?? provider.efforts;
-	if (efforts.length > 0 && !payload.effort) return { code: "effort_required", message: "发送前请选择 Effort。" };
-	if (payload.effort && payload.effort !== "auto" && !efforts.some((item) => item.id === payload.effort)) {
-		return { code: "effort_unavailable", message: efforts.length === 0 ? "所选 Model 不支持 Effort。" : "所选 Effort 不属于这个 Model。" };
-	}
+	if (efforts.length === 0) return null;
+	if (!payload.effort) return { code: "effort_required", message: "发送前请选择 Effort。" };
+	if (!efforts.some((item) => item.id === payload.effort)) return { code: "effort_unavailable", message: "所选 Effort 不属于这个 Model。" };
 	return null;
 }
 
+/** True when the selected model has a ladder, so the payload's effort is meant for it. */
+function offersEffort(capabilities: Capabilities, payload: TurnPayload): boolean {
+	if (capabilities.providers.length === 0) return true;
+	const provider = capabilities.providers.find((item) => item.id === payload.provider);
+	const model = provider?.models.find((item) => item.id === payload.model);
+	return (model?.efforts ?? provider?.efforts ?? []).length > 0;
+}
+
+/**
+ * What one failed request says about the Connection.
+ *
+ * An endpoint that answered is reachable, whatever it answered: a 503 for one
+ * model, a 400 for one parameter, a 404 for a retired id are that request's
+ * problem and the reply shows them. Only a credential refusal or a rate
+ * limit describe the Connection itself. Marking the Connection offline on any
+ * answered error left it red — in the header and in Settings — until the
+ * writer pressed Test by hand, while every other model on it worked.
+ * Silence (no status at all) is the one thing that does mean offline.
+ */
 function healthFromError(event: Extract<AIEvent, { type: "error" }>): ConnectionHealth {
-	const auth = event.code === "unauthorized" || event.code === "token_expired";
-	return { kind: auth ? "auth-error" : event.code === "rate_limited" ? "unavailable" : "offline", detail: event.message, lastChecked: new Date().toISOString() };
+	const now = new Date().toISOString();
+	if (event.code === "unauthorized" || event.code === "token_expired") return { kind: "auth-error", detail: event.message, lastChecked: now };
+	if (event.code === "rate_limited" || event.status === 429) return { kind: "unavailable", detail: event.message, lastChecked: now };
+	if (event.status !== undefined) return { kind: "connected", lastChecked: now };
+	return { kind: "offline", detail: event.message, lastChecked: now };
 }
 
 function isClientRequestError(code: string | undefined): boolean {

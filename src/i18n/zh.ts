@@ -510,7 +510,6 @@ export const zh = {
 	"history.groupEarlier": "更早",
 
 	// The composer: input, send controls, selectors, and their hints.
-	"composer.effortServerDefault": "默认（由服务商决定）",
 	"composer.unset": "选择",
 	"composer.unavailableSuffix": "{label}（不可用）",
 	"composer.placeholderSkill": "可以直接发送，或补充你的要求…",
@@ -532,10 +531,10 @@ export const zh = {
 	"composer.moreActionsAria": "更多写作动作",
 	"composer.moreActionsBlockedAria": "更多写作动作（{hint}）",
 	"composer.more": "更多",
-	"composer.noProviders": "已启用的连接都没有可用的服务商",
+	"composer.noProviders": "没有可用的连接",
 	"composer.addConnectionFirst": "请先在设置中添加并启用 AI 连接",
 	"composer.noModels": "这个服务商没有可用的模型",
-	"composer.selectProviderFirst": "请先选择服务商",
+	"composer.selectConnectionFirst": "请先选择连接",
 	"composer.selectModelFirst": "请先选择模型",
 	// The main panel: notices, empty state, apply/undo, and history labels.
 	"view.stalePreview": "原文在生成期间发生了变化，暂未应用。",
@@ -622,10 +621,8 @@ export const zh = {
 	"settings.connections.addButton": "添加连接",
 
 	"settings.defaults.connectionDesc": "新会话默认使用。",
-	"settings.defaults.providerDesc": "来自所选连接。",
 	"settings.defaults.selectConnectionFirst": "先选择连接。",
 	"settings.defaults.modelDesc": "来自所选服务商。",
-	"settings.defaults.selectProviderFirst": "先选择服务商。",
 	"settings.defaults.effortDesc": "按所选模型支持的档位。",
 	"settings.defaults.effortUnsupported": "所选模型不提供。",
 	"settings.defaults.selectModelFirst": "先选择模型。",

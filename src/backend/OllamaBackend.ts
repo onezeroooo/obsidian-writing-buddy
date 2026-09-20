@@ -12,6 +12,7 @@ import { adapterInstructions, adapterMessages, rewriteMessages, withSystemMessag
 import { fetchHttpClient, type HttpClient } from "./HttpClient";
 import { unsafeVaultPathMessage } from "./safePath";
 import { t } from "../i18n";
+import { fullEffortLadder, isOllamaLevelledThinkingFamily, ollamaThink } from "./effort";
 
 
 
@@ -39,8 +40,14 @@ export class OllamaBackend implements AIBackend {
 
 	async getCapabilities(): Promise<Capabilities> {
 		const models = await this.models();
+		// Effort is offered only where Ollama's `think` takes a level: a model
+		// the server reports as thinking-capable and of a family that reads one.
+		// Other thinking models take `think` as a flag, which Ollama already
+		// sets for them; a control that changed nothing would be a false one.
+		const levelled = await Promise.all(models.map(async (id) => isOllamaLevelledThinkingFamily(id) && await this.thinks(id)));
+		const mapped = models.map((id, index) => ({ id, efforts: levelled[index] ? fullEffortLadder() : [] }));
 		return {
-			providers: [{ id: "local", label: "Local", models: models.map((id) => ({ id, efforts: [] })), efforts: [] }],
+			providers: [{ id: "local", label: "Local", models: mapped, efforts: mapped.some((model) => model.efforts.length > 0) ? fullEffortLadder() : [] }],
 			modes: ["chat", "rewrite"],
 			streaming: false,
 		};
@@ -67,6 +74,23 @@ export class OllamaBackend implements AIBackend {
 			: [];
 	}
 
+	/** Whether `/api/show` lists `thinking` among the model's capabilities. A failed lookup counts as no. */
+	private async thinks(model: string): Promise<boolean> {
+		try {
+			const response = await this.httpClient({
+				url: this.baseUrl + "/api/show",
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ model }),
+			});
+			if (!response.ok) return false;
+			const capabilities = object(response.json).capabilities;
+			return Array.isArray(capabilities) && capabilities.includes("thinking");
+		} catch {
+			return false;
+		}
+	}
+
 	private async *generate(payload: TurnPayload | RewritePayload, rewrite: boolean): AsyncIterable<AIEvent> {
 		if (payload.provider !== "local") {
 			yield { type: "error", code: "provider_unavailable", message: t("backend.providerNotOnConnection") };
@@ -85,7 +109,8 @@ export class OllamaBackend implements AIBackend {
 			const messages = rewrite
 				? rewriteMessages(payload as RewritePayload)
 				: adapterMessages(payload);
-			yield { type: "provider.selected", provider: "local", model: payload.model };
+			const think = isOllamaLevelledThinkingFamily(payload.model) ? ollamaThink(payload.effort) : undefined;
+			yield { type: "provider.selected", provider: "local", model: payload.model, ...(think ? { effort: payload.effort ?? undefined } : {}) };
 			const response = await this.httpClient({
 				url: this.baseUrl + "/api/chat",
 				method: "POST",
@@ -95,6 +120,7 @@ export class OllamaBackend implements AIBackend {
 					model: payload.model,
 					stream: false,
 					messages: withSystemMessage(adapterInstructions(payload), messages),
+					...(think ? { think } : {}),
 				}),
 			});
 			if (!response.ok) throw new Error("Ollama HTTP " + response.status + "：" + response.text.slice(0, 200));
@@ -125,6 +151,7 @@ export class OllamaBackend implements AIBackend {
 				metadata: {
 					provider: "local",
 					model: payload.model,
+					...(think && payload.effort ? { effort: payload.effort } : {}),
 					...(Object.keys(usage).length > 0 ? { usage } : {}),
 				},
 			};

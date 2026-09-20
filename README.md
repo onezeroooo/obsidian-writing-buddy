@@ -84,7 +84,7 @@ Hosted providers may require their own account, API key, and paid usage. Those c
 
 Supported options include OpenAI, Anthropic, Google, DeepSeek, OpenRouter, Mistral, Groq, Cerebras, Together AI, Fireworks AI, Perplexity, Hugging Face, SiliconFlow, Ollama, and custom OpenAI-compatible endpoints.
 
-A conversation can independently choose its Connection, Provider, Model, Effort, and Context. Writing Buddy never silently switches to another connection when the one you selected is unavailable.
+A conversation can independently choose its Connection, Model, Effort, and Context. Writing Buddy never silently switches to another connection when the one you selected is unavailable.
 
 See [AI Connections](docs/AI_CONNECTIONS.md) for setup and provider details.
 

@@ -6,6 +6,7 @@ import {
 	sharedCapabilityInstruction,
 	sharedCitationInstruction,
 	sharedContinueOutputInstruction,
+	sharedPresentationInstruction,
 	sharedReviewInstruction,
 	sharedRewriteOutputInstruction,
 	sharedSelectionInstruction,
@@ -20,6 +21,7 @@ export type InstructionLayerId =
 	| "shared-review"
 	| "shared-output"
 	| "shared-proposal"
+	| "shared-presentation"
 	| "shared-capabilities"
 	| "project-customization"
 	| "shared-pressed-action"
@@ -130,6 +132,13 @@ export function composeEffectiveInstructions(
 		if (options.conversational && options.hasSelection && !review) {
 			addLayer(layers, "shared-proposal", "shared", sharedCandidateProposalInstruction(), true);
 		}
+	}
+
+	// The writer reads conversational prose as plain text, so a turn whose
+	// reply is prose is told how it will look. The candidate transport's whole
+	// reply is a passage and has no layout to get wrong.
+	if (options.conversational || (action !== "rewrite" && action !== "continue")) {
+		addLayer(layers, "shared-presentation", "shared", sharedPresentationInstruction(), true);
 	}
 
 	addLayer(layers, "project-customization", "project", options.projectCustomization, false);

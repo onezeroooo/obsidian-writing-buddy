@@ -248,7 +248,19 @@ export type AIEvent =
 	 * not "you may retry this" — a `rate_limited` failure carries
 	 * `retryable: false` and is still exactly the kind you wait out.
 	 */
-	| { type: "error"; message: string; code?: string; retryable?: boolean; retryAfterSec?: number }
+	| {
+		type: "error";
+		message: string;
+		code?: string;
+		retryable?: boolean;
+		retryAfterSec?: number;
+		/**
+		 * The HTTP status the endpoint answered with, when it answered at all.
+		 * An answer — even a refusal — is proof the endpoint is reachable, which
+		 * a transport failure (no status) is not; connection health reads it.
+		 */
+		status?: number;
+	}
 	| { type: "done" };
 
 export interface ChatResult {

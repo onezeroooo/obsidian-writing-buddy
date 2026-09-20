@@ -1,11 +1,13 @@
 /**
  * Capability parsing.
  *
- * The plugin never hard-codes a model list or an effort ladder — those come
- * from the selected Connection's capabilities response. This parser is deliberately forgiving:
- * a server that returns a plain string array of models is just as acceptable as
- * one that returns rich objects, and anything unrecognised is dropped rather
- * than allowed to break the settings panel.
+ * The plugin never hard-codes a model list — that comes from the selected
+ * Connection's capabilities response. Effort follows one ladder everywhere
+ * (`effort.ts`), narrowed by whatever a Connection advertises for a model.
+ * This parser is deliberately forgiving: a server that returns a plain string
+ * array of models is just as acceptable as one that returns rich objects, and
+ * anything unrecognised is dropped rather than allowed to break the settings
+ * panel.
  *
  * Field names verified against the live Runtime V2:
  *
@@ -43,23 +45,17 @@ export function isUnroutableProvider(provider: string | null | undefined): boole
  * The same story, one field over.
  *
  * `auto` was offered as an effort and sent verbatim, and the Runtime answers
- * `400 unsupported_effort` to it — measured against the live service, which
- * accepts `high`, `medium` and `low` but not this. It was never a value: it is
- * the writer saying "you decide", and the wire spells that by omitting the
- * field, exactly as it does for a provider.
- *
- * That it worked for a while is what hid it. The service used to advertise an
- * effort ladder and evidently tolerated the word; it advertises none now, and a
- * stored `auto` from those days is still sitting in device settings. Kept as a
- * constant so that value can be recognised and dropped on the way out rather
- * than migrated.
+ * `400 unsupported_effort` to it. It was never a value; neither was the
+ * "provider decides" row that replaced it, which put no field on the wire and
+ * meant a different thing on every provider. Effort is now always one of the
+ * ladder's words (`effort.ts`), pre-selected when a model is chosen. The
+ * constant survives only so a value stored by an older version can be
+ * recognised and dropped on the way in, where the ladder's default takes its
+ * place.
  */
 export const AUTO_EFFORT = "auto";
 
-/** The empty value in the UI: send no effort and let the server pick. */
-export const SERVER_DEFAULT_EFFORT = "";
-
-/** True when a stored effort must not be put on the wire. */
+/** True when a stored effort is not a value and must be replaced by the default. */
 export function isUnroutableEffort(effort: string | null | undefined): boolean {
 	return !effort || effort === AUTO_EFFORT;
 }

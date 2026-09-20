@@ -1,5 +1,7 @@
 import type { AIConnection } from "../connections/types";
 import { connectionSnapshot } from "../connections/types";
+import type { EffortCapability } from "../backend/AIBackend";
+import { defaultEffortFor, resolveEffort } from "../backend/effort";
 import type { SessionPreferences } from "../types";
 
 /**
@@ -22,7 +24,7 @@ export function updateComposerPreferences(
 	current: SessionPreferences,
 	patch: Partial<SessionPreferences>,
 	connection: AIConnection | null,
-	effortsForModel: (connectionId: string | undefined, provider: string, model: string | undefined) => unknown[],
+	effortsForModel: (connectionId: string | undefined, provider: string, model: string | undefined) => readonly EffortCapability[],
 ): SessionPreferences {
 	const next: SessionPreferences = { ...current, ...patch };
 	if (patch.connectionId !== undefined) {
@@ -46,10 +48,29 @@ export function updateComposerPreferences(
 		delete next.effort;
 	}
 	if (patch.model !== undefined) {
-		if (effortsForModel(next.connectionId, next.provider ?? "", patch.model).length > 0) next.effort = "auto";
+		// A new model starts at its ladder's default; one without a ladder
+		// carries no effort.
+		const effort = defaultEffortFor(effortsForModel(next.connectionId, next.provider ?? "", patch.model));
+		if (effort) next.effort = effort;
 		else delete next.effort;
 	}
 	return stripEmptyPreferences(next);
+}
+
+/**
+ * Put a conversation's effort onto the model's current ladder.
+ *
+ * Stored preferences can carry a level the model no longer offers — an older
+ * install's `auto`, or a ladder that changed after discovery — or none at all.
+ * Both read as the default rather than as an empty row the writer must fill.
+ */
+export function withResolvedEffort(preferences: SessionPreferences, efforts: readonly EffortCapability[]): SessionPreferences {
+	const effort = resolveEffort(preferences.effort, efforts);
+	if (effort === preferences.effort) return preferences;
+	const next = { ...preferences };
+	if (effort) next.effort = effort;
+	else delete next.effort;
+	return next;
 }
 
 /** Drop empty values before device-local persistence or request execution. */

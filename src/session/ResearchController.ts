@@ -16,6 +16,7 @@ import type { EvidenceItem } from "../context/evidence";
 import { buildEvidence, evidenceDocumentPayloads } from "../context/evidence";
 import {
 	DEFAULT_MAX_QUERY_CHARS,
+	RESEARCH_PLAN_SENTINEL,
 	containsResearchAction,
 	isRecoverablePlanFallback,
 	keepAllowedResearchCitations,
@@ -103,9 +104,18 @@ export const MAX_RESEARCH_OBSERVATION_CHARS = 16_000;
  * The old limit turned that into nothing at all, which is worse than the wrong
  * answer it replaced.
  *
- * This is a runaway guard, not a service target. Ordinary turns no longer enter
- * this loop at all (D-023, D-024), so the wait applies to questions that
- * genuinely need the manuscript searched.
+ * This is a runaway guard on research, not on answering. The clock starts at
+ * the first retrieval the model asks for and covers the action loop from
+ * there: further planning calls, searches and reads. A call that merely
+ * answers — the merged decision call before any retrieval, or the final
+ * synthesis — is not research and is not bounded by it; it runs under the
+ * same contract as an ordinary turn (the writer's cancel, the backend's own
+ * limits). Measured on a local 27B model, reading a 5.7k-token prompt alone
+ * takes ~55 s; a clock armed before the model has done anything turned that
+ * into a cancelled turn with no answer, which is the failure D-025 removed
+ * from the retrieval side. Ordinary turns no longer enter this loop at all
+ * (D-024, D-029), so the wait applies to questions that genuinely need the
+ * manuscript searched.
  */
 export const DEFAULT_RESEARCH_DEADLINE_MS = 90_000;
 export const MAX_RESEARCH_DEADLINE_MS = 120_000;
@@ -322,7 +332,9 @@ export class ResearchController {
 			cancelled: false, deadlineExceeded: false, requestId: null, abortController: new AbortController(),
 		};
 		this.activeJob = job;
-		const deadlineAt = this.now() + budget.deadlineMs;
+		// The research clock is armed by the first retrieval, not by the run.
+		// Until then every call is an answering call and carries no deadline.
+		let deadlineAt = Number.POSITIVE_INFINITY;
 		const preferences = Object.freeze({ ...options.preferences });
 		const metadata = connectionMetadata(preferences);
 		const facts: TurnFacts = {};
@@ -441,10 +453,28 @@ export class ResearchController {
 					...(observationPrompt.text ? [{ role: "user" as const, content: observationPrompt.text }] : []),
 					{ role: "user", content: roundPrompt },
 				];
+				// The merged decision call is, most of the time, the answer, and the
+				// writer should see it arrive the way any other answer arrives. Its
+				// text is shown as it streams until a framed action appears — then
+				// the reply was a plan, which stays private, and the shown text is
+				// withdrawn. The tail is held back while it could still be the start
+				// of the sentinel, so no fragment of the frame is ever shown.
+				let shownAnswer = false;
+				const onDecisionDelta = completion === "gather" ? undefined : (text: string): void => {
+					const visible = answerPrefixBeforeAction(text);
+					if (visible === null) {
+						if (shownAnswer) { shownAnswer = false; progress("planning"); }
+						return;
+					}
+					if (!visible) return;
+					shownAnswer = true;
+					progress("synthesizing", keepAllowedResearchCitations(visible, new Set(retrieval.ledger.evidence.map((item) => item.id.toUpperCase()))));
+				};
 				let planOutcome = await this.call(
 					job, deadlineAt, requestIds, options.session.id, preferences, plannerMessages,
-					retrieval.ledger.evidence, researchSkill, metadata, facts,
+					retrieval.ledger.evidence, researchSkill, metadata, facts, onDecisionDelta,
 				);
+				if (shownAnswer && !(planOutcome.ok && completion !== "gather" && !containsResearchAction(planOutcome.text))) progress("planning");
 				unconsumedSearch = false;
 				state.backendCalls = requestIds.length;
 				if (planOutcome.ok && completion !== "gather" && !containsResearchAction(planOutcome.text)) {
@@ -524,6 +554,7 @@ export class ResearchController {
 						requestIds: [...requestIds],
 					};
 				}
+				if (!Number.isFinite(deadlineAt)) deadlineAt = this.now() + budget.deadlineMs;
 				progress("retrieving");
 				const retrievalOptions = { signal: job.abortController.signal, deadlineAt };
 				// One action can now admit several sources, so every branch produces a
@@ -596,12 +627,11 @@ export class ResearchController {
 					forcedSynthesis: state.forcedSynthesis,
 				}) },
 			];
-			// The action loop and final answer are distinct bounded phases. A valid
-			// search/read sequence must not leave the final call only the few
-			// milliseconds remaining on the research clock. Final synthesis gets one
-			// fresh, still-finite window; action counts and every retrieval budget stay
-			// unchanged.
-			const finalDeadlineAt = this.now() + budget.deadlineMs;
+			// The final answer is not research: the action loop's clock does not
+			// reach it, and it gets no clock of its own. A valid search/read
+			// sequence must not leave the answer a few milliseconds, and a slow
+			// model reading its evidence is not a runaway.
+			const finalDeadlineAt = Number.POSITIVE_INFINITY;
 			const finalOutcome = await this.call(
 				job, finalDeadlineAt, requestIds, options.session.id, preferences, finalMessages,
 				retrieval.ledger.evidence, options.skill, metadata, facts,
@@ -736,7 +766,8 @@ export class ResearchController {
 		return outcome;
 	}
 
-	private armDeadline(job: ActiveResearchJob, deadlineAt: number, requestId: string): number {
+	private armDeadline(job: ActiveResearchJob, deadlineAt: number, requestId: string): number | undefined {
+		if (!Number.isFinite(deadlineAt)) return undefined;
 		const remaining = Math.max(0, deadlineAt - this.now());
 		return window.setTimeout(() => {
 			if (this.activeJob !== job || job.requestId !== requestId || job.cancelled) return;
@@ -1346,4 +1377,19 @@ function gatherSkill(skill: SkillPayload | undefined): SkillPayload | undefined 
 function boundedInteger(value: number | undefined, fallbackValue: number, minimum: number, maximum: number): number {
 	if (!Number.isFinite(value)) return Math.max(minimum, Math.min(maximum, Math.floor(fallbackValue)));
 	return Math.max(minimum, Math.min(maximum, Math.floor(value as number)));
+}
+
+/**
+ * The part of a streaming decision reply that may be shown as an answer.
+ *
+ * `null` once the research sentinel has appeared: the reply is a plan and
+ * nothing of it is shown. Otherwise the text, minus a tail that is still a
+ * prefix of the sentinel — `<WB_RES` may become the frame on the next chunk.
+ */
+export function answerPrefixBeforeAction(text: string): string | null {
+	if (text.includes(RESEARCH_PLAN_SENTINEL)) return null;
+	const open = text.lastIndexOf("<");
+	if (open === -1) return text;
+	const tail = text.slice(open);
+	return RESEARCH_PLAN_SENTINEL.startsWith(tail) ? text.slice(0, open) : text;
 }

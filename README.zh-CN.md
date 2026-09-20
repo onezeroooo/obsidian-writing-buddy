@@ -82,7 +82,7 @@
 
 支持 OpenAI、Anthropic、Google、DeepSeek、OpenRouter、Mistral、Groq、Cerebras、Together AI、Fireworks AI、Perplexity、Hugging Face、SiliconFlow、Ollama，以及自定义 OpenAI 兼容端点。
 
-每个对话都可以独立选择连接、服务商、模型、推理强度和上下文。如果所选连接失效，墨伴会提示你重新选择。
+每个对话都可以独立选择连接、模型、推理强度和上下文。如果所选连接失效，墨伴会提示你重新选择。
 
 连接方式和服务商细节见 [AI Connections](docs/AI_CONNECTIONS.md)。
 

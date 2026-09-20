@@ -13,6 +13,7 @@ import { fetchHttpClient, type HttpClient, type HttpRequest, type HttpResponse }
 import { unsafeVaultPathMessage } from "./safePath";
 import { redactCredential } from "../auth/redact";
 import { t } from "../i18n";
+import { fullEffortLadder } from "./effort";
 import { asError } from "../util/errors";
 
 export const LOCAL_OPENAI_REQUEST_TIMEOUT_MS = 120_000;
@@ -21,11 +22,11 @@ export const DEFAULT_LOCAL_OPENAI_MODEL = "gemma4-12b-writing";
 
 
 /**
- * Reasoning levels llama.cpp itself accepts for `reasoning_effort`. Which of
- * them a model does anything useful with is the chat template's business, so
- * they are only offered when the server says the template understands them.
+ * llama.cpp accepts the plugin's whole ladder for `reasoning_effort`. Which of
+ * the levels a model does anything useful with is the chat template's
+ * business, so they are only offered when the server says the template
+ * understands them.
  */
-const REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 /** What `GET /props` tells us about the loaded model. llama.cpp's own capability document. */
 interface ServerProps {
@@ -126,9 +127,7 @@ export class LlamaCppBackend implements AIBackend {
 			// swapping in a model that understands reasoning effort makes the
 			// control appear here on its own, with no code change.
 			const props = await this.serverProps();
-			const efforts = props.supportsReasoningEffort
-				? REASONING_EFFORTS.map((id) => ({ id, label: id }))
-				: [];
+			const efforts = props.supportsReasoningEffort ? fullEffortLadder() : [];
 			return {
 				providers: [{
 					id: "local",

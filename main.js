@@ -489,7 +489,6 @@ var en = {
   "history.group7Days": "Past 7 days",
   "history.group30Days": "Past 30 days",
   "history.groupEarlier": "Earlier",
-  "composer.effortServerDefault": "Default (provider decides)",
   "composer.unset": "Choose",
   "composer.unavailableSuffix": "{label} (unavailable)",
   "composer.placeholderSkill": "Send as is, or add your requirements\u2026",
@@ -511,10 +510,10 @@ var en = {
   "composer.moreActionsAria": "More writing actions",
   "composer.moreActionsBlockedAria": "More writing actions ({hint})",
   "composer.more": "More",
-  "composer.noProviders": "No enabled connection offers a usable provider",
+  "composer.noProviders": "No connection is available",
   "composer.addConnectionFirst": "Add and enable an AI connection in Settings first",
   "composer.noModels": "This provider has no usable model",
-  "composer.selectProviderFirst": "Choose a provider first",
+  "composer.selectConnectionFirst": "Choose a connection first",
   "composer.selectModelFirst": "Choose a model first",
   "view.stalePreview": "The original text changed while generating; nothing was applied yet.",
   "view.staleApply": "The original text changed and the passage can no longer be located uniquely. Select the passage again.",
@@ -595,10 +594,8 @@ var en = {
   "settings.connections.addDesc": "Configure a new AI connection.",
   "settings.connections.addButton": "Add connection",
   "settings.defaults.connectionDesc": "Used by new conversations.",
-  "settings.defaults.providerDesc": "From the selected connection.",
   "settings.defaults.selectConnectionFirst": "Select a connection first.",
   "settings.defaults.modelDesc": "From the selected provider.",
-  "settings.defaults.selectProviderFirst": "Select a provider first.",
   "settings.defaults.effortDesc": "As the selected model supports.",
   "settings.defaults.effortUnsupported": "Not offered by the selected model.",
   "settings.defaults.selectModelFirst": "Select a model first.",
@@ -1157,7 +1154,6 @@ var zh = {
   "history.group30Days": "\u8FC7\u53BB 30 \u5929",
   "history.groupEarlier": "\u66F4\u65E9",
   // The composer: input, send controls, selectors, and their hints.
-  "composer.effortServerDefault": "\u9ED8\u8BA4\uFF08\u7531\u670D\u52A1\u5546\u51B3\u5B9A\uFF09",
   "composer.unset": "\u9009\u62E9",
   "composer.unavailableSuffix": "{label}\uFF08\u4E0D\u53EF\u7528\uFF09",
   "composer.placeholderSkill": "\u53EF\u4EE5\u76F4\u63A5\u53D1\u9001\uFF0C\u6216\u8865\u5145\u4F60\u7684\u8981\u6C42\u2026",
@@ -1179,10 +1175,10 @@ var zh = {
   "composer.moreActionsAria": "\u66F4\u591A\u5199\u4F5C\u52A8\u4F5C",
   "composer.moreActionsBlockedAria": "\u66F4\u591A\u5199\u4F5C\u52A8\u4F5C\uFF08{hint}\uFF09",
   "composer.more": "\u66F4\u591A",
-  "composer.noProviders": "\u5DF2\u542F\u7528\u7684\u8FDE\u63A5\u90FD\u6CA1\u6709\u53EF\u7528\u7684\u670D\u52A1\u5546",
+  "composer.noProviders": "\u6CA1\u6709\u53EF\u7528\u7684\u8FDE\u63A5",
   "composer.addConnectionFirst": "\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u5E76\u542F\u7528 AI \u8FDE\u63A5",
   "composer.noModels": "\u8FD9\u4E2A\u670D\u52A1\u5546\u6CA1\u6709\u53EF\u7528\u7684\u6A21\u578B",
-  "composer.selectProviderFirst": "\u8BF7\u5148\u9009\u62E9\u670D\u52A1\u5546",
+  "composer.selectConnectionFirst": "\u8BF7\u5148\u9009\u62E9\u8FDE\u63A5",
   "composer.selectModelFirst": "\u8BF7\u5148\u9009\u62E9\u6A21\u578B",
   // The main panel: notices, empty state, apply/undo, and history labels.
   "view.stalePreview": "\u539F\u6587\u5728\u751F\u6210\u671F\u95F4\u53D1\u751F\u4E86\u53D8\u5316\uFF0C\u6682\u672A\u5E94\u7528\u3002",
@@ -1265,10 +1261,8 @@ var zh = {
   "settings.connections.addDesc": "\u914D\u7F6E\u65B0\u7684 AI \u8FDE\u63A5\u3002",
   "settings.connections.addButton": "\u6DFB\u52A0\u8FDE\u63A5",
   "settings.defaults.connectionDesc": "\u65B0\u4F1A\u8BDD\u9ED8\u8BA4\u4F7F\u7528\u3002",
-  "settings.defaults.providerDesc": "\u6765\u81EA\u6240\u9009\u8FDE\u63A5\u3002",
   "settings.defaults.selectConnectionFirst": "\u5148\u9009\u62E9\u8FDE\u63A5\u3002",
   "settings.defaults.modelDesc": "\u6765\u81EA\u6240\u9009\u670D\u52A1\u5546\u3002",
-  "settings.defaults.selectProviderFirst": "\u5148\u9009\u62E9\u670D\u52A1\u5546\u3002",
   "settings.defaults.effortDesc": "\u6309\u6240\u9009\u6A21\u578B\u652F\u6301\u7684\u6863\u4F4D\u3002",
   "settings.defaults.effortUnsupported": "\u6240\u9009\u6A21\u578B\u4E0D\u63D0\u4F9B\u3002",
   "settings.defaults.selectModelFirst": "\u5148\u9009\u62E9\u6A21\u578B\u3002",
@@ -1718,7 +1712,6 @@ function describeChatSteps(request) {
 // src/backend/capabilities.ts
 var AUTO_PROVIDER = "auto";
 var AUTO_EFFORT = "auto";
-var SERVER_DEFAULT_EFFORT = "";
 function isUnroutableEffort(effort) {
   return !effort || effort === AUTO_EFFORT;
 }
@@ -7901,6 +7894,11 @@ var ZH = {
     "\u4F5C\u8005\u53EF\u4EE5\uFF1A\u5728\u6B63\u6587\u4E2D\u9009\u4E2D\u6BB5\u843D\u540E\u5411\u4F60\u63D0\u95EE\uFF0C\u6216\u4F7F\u7528\u6539\u5199\u3001\u6DA6\u8272\u7B49\u52A8\u4F5C\u6309\u94AE\uFF1B\u4E5F\u53EF\u4EE5\u5207\u6362 Full \u6A21\u5F0F\u505A\u5168\u7A3F\u5206\u6790\u3002",
     "\u4E0D\u8981\u58F0\u79F0\u62E5\u6709\u6B64\u5916\u7684\u80FD\u529B\uFF0C\u4F8B\u5982\u76F4\u63A5\u4FEE\u6539\u6587\u4EF6\u3001\u6253\u5F00\u6216\u8BFB\u53D6\u672A\u63D0\u4F9B\u7684\u5185\u5BB9\u3001\u66FF\u4F5C\u8005\u6267\u884C\u754C\u9762\u64CD\u4F5C\u3002"
   ].join("\n"),
+  presentation: [
+    "\u56DE\u7B54\u7684\u5448\u73B0\uFF1A",
+    "\u56DE\u7B54\u5728\u754C\u9762\u91CC\u6309\u7EAF\u6587\u672C\u539F\u6837\u663E\u793A\uFF0C\u4E0D\u6E32\u67D3 Markdown\u3002\u7528\u666E\u901A\u6BB5\u843D\u548C\u81EA\u7136\u7684\u53E5\u5B50\u7EC4\u7EC7\u56DE\u7B54\uFF1B\u4E0D\u8981\u7528 # \u6807\u9898\u3001**\u52A0\u7C97**\u3001> \u5F15\u7528\u5757\u3001\u8868\u683C\u6216\u4EE3\u7801\u56F4\u680F\u6765\u6392\u7248\u3002\u9700\u8981\u5206\u70B9\u65F6\uFF0C\u7528\u300C1.\u300D\u300C2.\u300D\u8FD9\u6837\u7684\u7B80\u5355\u7F16\u53F7\u5373\u53EF\u3002",
+    "\u4E3E\u4F8B\u3001\u793A\u8303\u6216\u5EFA\u8BAE\u7684\u6587\u5B57\u76F4\u63A5\u5199\u8FDB\u6BB5\u843D\uFF0C\u6216\u7528\u5F15\u53F7\u6807\u51FA\uFF0C\u4E0D\u8981\u653E\u8FDB\u56F4\u680F\u3002\u552F\u4E00\u7684\u4F8B\u5916\u662F\u672C\u4EA7\u54C1\u53E6\u884C\u8BF4\u660E\u7684\u5E26\u6807\u7B7E\u5019\u9009\u56F4\u680F\u2014\u2014\u90A3\u662F\u4E00\u4EFD\u53EF\u5E94\u7528\u7684\u63D0\u8BAE\uFF0C\u4E0D\u662F\u6392\u7248\u3002"
+  ].join("\n"),
   pressed: (name) => [
     `\u672C\u56DE\u5408\u4F5C\u8005\u6309\u4E0B\u4E86\u300C${name}\u300D\u52A8\u4F5C\u6309\u94AE\uFF0C\u5E76\u8F93\u5165\u4E86\u6587\u5B57\u3002`,
     "\u8F93\u5165\u7684\u6587\u5B57\u662F\u5BF9\u8FD9\u6B21\u6539\u52A8\u7684\u5177\u4F53\u8981\u6C42\uFF0C\u4E0D\u662F\u65B0\u8BDD\u9898\uFF1B\u4E0D\u8981\u53EA\u56DE\u5E94\u4E0A\u4E00\u8F6E\u8BA8\u8BBA\u8FC7\u7684\u5185\u5BB9\u3002"
@@ -7958,6 +7956,11 @@ var EN = {
     "The author can: select a passage in the manuscript and ask you about it, or use action buttons such as Rewrite and Polish; they can also switch to Full mode for whole-manuscript analysis.",
     "Do not claim abilities beyond these, such as modifying files directly, opening or reading content that was not provided, or operating the interface for the author."
   ].join("\n"),
+  presentation: [
+    "How the reply is shown:",
+    'The reply is displayed as plain text, exactly as written; Markdown is not rendered. Write in ordinary paragraphs and natural sentences \u2014 no # headings, **bold**, > block quotes, tables, or code fences for layout. When points need separating, simple numbering such as "1." and "2." is enough.',
+    "Text offered as an example, illustration, or suggestion goes straight into the paragraph or inside quotation marks, never inside a fence. The one exception is the labelled candidate fence this product describes separately \u2014 that is an applicable proposal, not layout."
+  ].join("\n"),
   pressed: (name) => [
     `This turn the author pressed the "${name}" action button and typed text.`,
     "The typed text is the specific requirement for this change, not a new topic; do not merely respond to what the previous turn discussed."
@@ -7989,6 +7992,9 @@ function sharedCandidateProposalInstruction() {
 }
 function sharedCapabilityInstruction() {
   return active().capability;
+}
+function sharedPresentationInstruction() {
+  return active().presentation;
 }
 function pressedWritingActionInstruction(name) {
   return active().pressed(name ?? (instructionLocale() === "en" ? "writing" : "\u5199\u4F5C"));
@@ -8033,6 +8039,9 @@ function composeEffectiveInstructions(options) {
     if (options.conversational && options.hasSelection && !review) {
       addLayer(layers, "shared-proposal", "shared", sharedCandidateProposalInstruction(), true);
     }
+  }
+  if (options.conversational || action2 !== "rewrite" && action2 !== "continue") {
+    addLayer(layers, "shared-presentation", "shared", sharedPresentationInstruction(), true);
   }
   addLayer(layers, "project-customization", "project", options.projectCustomization, false);
   addLayer(layers, "task-skill", "skill", options.skill?.instruction, false);
@@ -11573,7 +11582,7 @@ var ResearchController = class {
       abortController: new AbortController()
     };
     this.activeJob = job;
-    const deadlineAt = this.now() + budget.deadlineMs;
+    let deadlineAt = Number.POSITIVE_INFINITY;
     const preferences = Object.freeze({ ...options.preferences });
     const metadata = connectionMetadata3(preferences);
     const facts = {};
@@ -11683,6 +11692,20 @@ var ResearchController = class {
           ...observationPrompt2.text ? [{ role: "user", content: observationPrompt2.text }] : [],
           { role: "user", content: roundPrompt }
         ];
+        let shownAnswer = false;
+        const onDecisionDelta = completion2 === "gather" ? void 0 : (text) => {
+          const visible = answerPrefixBeforeAction(text);
+          if (visible === null) {
+            if (shownAnswer) {
+              shownAnswer = false;
+              progress("planning");
+            }
+            return;
+          }
+          if (!visible) return;
+          shownAnswer = true;
+          progress("synthesizing", keepAllowedResearchCitations(visible, new Set(retrieval.ledger.evidence.map((item) => item.id.toUpperCase()))));
+        };
         let planOutcome = await this.call(
           job,
           deadlineAt,
@@ -11693,8 +11716,10 @@ var ResearchController = class {
           retrieval.ledger.evidence,
           researchSkill,
           metadata,
-          facts
+          facts,
+          onDecisionDelta
         );
+        if (shownAnswer && !(planOutcome.ok && completion2 !== "gather" && !containsResearchAction(planOutcome.text))) progress("planning");
         unconsumedSearch = false;
         state.backendCalls = requestIds.length;
         if (planOutcome.ok && completion2 !== "gather" && !containsResearchAction(planOutcome.text)) {
@@ -11770,6 +11795,7 @@ var ResearchController = class {
             requestIds: [...requestIds]
           };
         }
+        if (!Number.isFinite(deadlineAt)) deadlineAt = this.now() + budget.deadlineMs;
         progress("retrieving");
         const retrievalOptions = { signal: job.abortController.signal, deadlineAt };
         let found;
@@ -11855,7 +11881,7 @@ var ResearchController = class {
           forcedSynthesis: state.forcedSynthesis
         }) }
       ];
-      const finalDeadlineAt = this.now() + budget.deadlineMs;
+      const finalDeadlineAt = Number.POSITIVE_INFINITY;
       const finalOutcome = await this.call(
         job,
         finalDeadlineAt,
@@ -12029,6 +12055,7 @@ var ResearchController = class {
     return outcome;
   }
   armDeadline(job, deadlineAt, requestId) {
+    if (!Number.isFinite(deadlineAt)) return void 0;
     const remaining = Math.max(0, deadlineAt - this.now());
     return window.setTimeout(() => {
       if (this.activeJob !== job || job.requestId !== requestId || job.cancelled) return;
@@ -12561,6 +12588,13 @@ function gatherSkill(skill) {
 function boundedInteger3(value, fallbackValue, minimum, maximum) {
   if (!Number.isFinite(value)) return Math.max(minimum, Math.min(maximum, Math.floor(fallbackValue)));
   return Math.max(minimum, Math.min(maximum, Math.floor(value)));
+}
+function answerPrefixBeforeAction(text) {
+  if (text.includes(RESEARCH_PLAN_SENTINEL)) return null;
+  const open = text.lastIndexOf("<");
+  if (open === -1) return text;
+  const tail3 = text.slice(open);
+  return RESEARCH_PLAN_SENTINEL.startsWith(tail3) ? text.slice(0, open) : text;
 }
 
 // src/session/ForegroundTurnCoordinator.ts
@@ -15225,7 +15259,7 @@ function detailRows(details) {
   const ran = [
     details.provider,
     details.model,
-    details.effort ? `Effort ${displayName(details.effort)}` : void 0
+    details.effort ? `Effort ${details.effort}` : void 0
   ].filter(
     (part) => Boolean(part)
   );
@@ -15327,9 +15361,6 @@ function connectionTypeName(value) {
   if (value === "direct-api") return "Direct API";
   if (value === "local") return "Local";
   return value;
-}
-function displayName(value) {
-  return value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value;
 }
 function formatCount(value) {
   return value.toLocaleString("en-US");
@@ -15740,8 +15771,7 @@ function quickActions(skills, maxVisible = MAX_VISIBLE_ACTIONS, activeSkillId) {
   return { visible: deduped.slice(0, maxVisible), overflow: deduped.slice(maxVisible) };
 }
 function effortDisplayName(id, label) {
-  if (label && label.trim().length > 0) return label;
-  return id.length > 0 ? id[0].toUpperCase() + id.slice(1) : id;
+  return label && label.trim().length > 0 ? label : id;
 }
 function parameterValueState(value, choices, savedLabel, choicesAreAuthoritative, unsupported = false) {
   const chosen = choices.find((choice) => choice.value === value);
@@ -15792,15 +15822,11 @@ function modelOptions(models) {
   return models.map((model) => ({ value: model.id, label: model.label ?? model.id }));
 }
 function effortOptions(efforts) {
-  return [
-    { value: SERVER_DEFAULT_EFFORT, label: t("composer.effortServerDefault") },
-    ...efforts.map((effort) => ({ value: effort.id, label: effort.label ?? effort.id }))
-  ];
+  return efforts.map((effort) => ({ value: effort.id, label: effort.label ?? effort.id }));
 }
 function missingSelections(preferences) {
   const missing = [];
-  if (!preferences.connectionId) missing.push(t("label.connection"));
-  if (!preferences.provider) missing.push(t("label.provider"));
+  if (!preferences.connectionId || !preferences.provider) missing.push(t("label.connection"));
   if (!preferences.model) missing.push(t("label.model"));
   if (!preferences.contextDepth) missing.push(t("label.context"));
   return missing;
@@ -15820,7 +15846,7 @@ function selectionIsAvailable(capabilities, preferences) {
   const model = provider?.models.find((item) => item.id === preferences.model);
   if (!provider || !model) return false;
   const efforts = model.efforts ?? provider.efforts;
-  if (isUnroutableEffort(preferences.effort)) return true;
+  if (efforts.length === 0) return true;
   return efforts.some((item) => item.id === preferences.effort);
 }
 function composerTurnControl(busy, ownsBusy) {
@@ -16024,7 +16050,7 @@ function renderSelectors(parent, options) {
   const providerChoices = crossConnectionProviderOptions(options.connections, options.capabilitiesFor);
   const hasEnabledConnection = options.connections.some((connection) => connection.enabled);
   param(group, {
-    label: t("label.provider"),
+    label: t("label.connection"),
     choices: providerChoices,
     value: options.preferences.connectionId && options.preferences.provider ? providerChoiceValue(options.preferences.connectionId, options.preferences.provider) : void 0,
     // A stored choice whose Connection was disabled or removed still says
@@ -16044,7 +16070,7 @@ function renderSelectors(parent, options) {
     value: options.preferences.model,
     savedLabel: options.preferences.model,
     choicesAreAuthoritative: capabilitiesKnown,
-    empty: options.preferences.provider ? t("composer.noModels") : t("composer.selectProviderFirst"),
+    empty: options.preferences.provider ? t("composer.noModels") : t("composer.selectConnectionFirst"),
     onChange: (value) => options.onPreferenceChange({ model: value })
   });
   param(group, {
@@ -16134,6 +16160,82 @@ function autoGrow(input) {
   input.setCssStyles({ height: `${Math.min(input.scrollHeight, 180)}px` });
 }
 
+// src/backend/effort.ts
+var EFFORT_LADDER = ["minimal", "low", "medium", "high", "xhigh", "max"];
+var DEFAULT_EFFORT = "medium";
+function isEffortLevel(value) {
+  return typeof value === "string" && EFFORT_LADDER.includes(value);
+}
+function fullEffortLadder() {
+  return EFFORT_LADDER.map((id) => ({ id }));
+}
+function advertisedEffortLadder(ids, defaultId) {
+  const unique4 = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  const known = EFFORT_LADDER.filter((level) => unique4.includes(level));
+  const unknown = unique4.filter((id) => !isEffortLevel(id));
+  return [...known, ...unknown].map((id) => id === defaultId ? { id, default: true } : { id });
+}
+function defaultEffortFor(efforts) {
+  if (efforts.length === 0) return void 0;
+  const flagged = efforts.find((effort) => effort.default === true);
+  if (flagged) return flagged.id;
+  if (efforts.some((effort) => effort.id === DEFAULT_EFFORT)) return DEFAULT_EFFORT;
+  return efforts[Math.floor((efforts.length - 1) / 2)].id;
+}
+function resolveEffort(stored, efforts) {
+  if (efforts.length === 0) return void 0;
+  if (stored && efforts.some((effort) => effort.id === stored)) return stored;
+  return defaultEffortFor(efforts);
+}
+var ANTHROPIC_THINKING_BUDGET = {
+  minimal: 1024,
+  low: 2048,
+  medium: 4096,
+  high: 8192,
+  xhigh: 16384,
+  max: 32768
+};
+var ANTHROPIC_ANSWER_TOKENS = 8192;
+function anthropicThinking(effort) {
+  if (!isEffortLevel(effort)) return { max_tokens: ANTHROPIC_ANSWER_TOKENS };
+  const budget = ANTHROPIC_THINKING_BUDGET[effort];
+  return { thinking: { type: "enabled", budget_tokens: budget }, max_tokens: budget + ANTHROPIC_ANSWER_TOKENS };
+}
+var GOOGLE_THINKING_BUDGET = {
+  minimal: 512,
+  low: 1024,
+  medium: 4096,
+  high: 8192,
+  xhigh: 16384,
+  max: 24576
+};
+function googleThinkingConfig(effort) {
+  return isEffortLevel(effort) ? { thinkingBudget: GOOGLE_THINKING_BUDGET[effort] } : void 0;
+}
+function ollamaThink(effort) {
+  if (!isEffortLevel(effort)) return void 0;
+  if (effort === "minimal" || effort === "low") return "low";
+  if (effort === "medium") return "medium";
+  return "high";
+}
+function bareModelId(model) {
+  return model.slice(model.lastIndexOf("/") + 1).toLowerCase();
+}
+function isOpenAIReasoningFamily(model) {
+  return /^(gpt-5|o[134])(?![a-z])/.test(bareModelId(model));
+}
+function isAnthropicThinkingFamily(model) {
+  const bare = bareModelId(model);
+  if (!bare.startsWith("claude")) return false;
+  return !/^claude-3-(opus|sonnet|haiku|5)/.test(bare);
+}
+function isGoogleThinkingFamily(model) {
+  return /^gemini-(2\.5|[3-9])/.test(bareModelId(model));
+}
+function isOllamaLevelledThinkingFamily(model) {
+  return /^gpt-oss/.test(bareModelId(model));
+}
+
 // src/ui/composerPreferences.ts
 function effectiveComposerPreferences(local, defaults) {
   return stripEmptyPreferences(local ?? { contextDepth: "auto", ...defaults });
@@ -16159,10 +16261,19 @@ function updateComposerPreferences(current2, patch, connection, effortsForModel)
     delete next.effort;
   }
   if (patch.model !== void 0) {
-    if (effortsForModel(next.connectionId, next.provider ?? "", patch.model).length > 0) next.effort = "auto";
+    const effort = defaultEffortFor(effortsForModel(next.connectionId, next.provider ?? "", patch.model));
+    if (effort) next.effort = effort;
     else delete next.effort;
   }
   return stripEmptyPreferences(next);
+}
+function withResolvedEffort(preferences, efforts) {
+  const effort = resolveEffort(preferences.effort, efforts);
+  if (effort === preferences.effort) return preferences;
+  const next = { ...preferences };
+  if (effort) next.effort = effort;
+  else delete next.effort;
+  return next;
 }
 function stripEmptyPreferences(preferences) {
   const next = {};
@@ -16796,12 +16907,13 @@ var WritingBuddyView = class extends import_obsidian12.ItemView {
     const connection = this.plugin.connection(preferences.connectionId);
     if (!connection) return preferences;
     const snapshot = connectionSnapshot(connection);
-    return {
+    const efforts = this.plugin.effortsForConnectionProvider(preferences.connectionId, preferences.provider ?? "", preferences.model);
+    return withResolvedEffort({
       ...preferences,
       connectionName: snapshot.name,
       connectionType: snapshot.type,
       ...snapshot.detail ? { connectionDetail: snapshot.detail } : {}
-    };
+    }, efforts);
   }
   async updatePreferences(patch) {
     const session = await this.plugin.sessions.ensureActive();
@@ -18154,9 +18266,9 @@ function retryExecutionPreferences(metadata, mode) {
   };
 }
 function lowerFinalRetryEffort(selected, efforts) {
-  const concrete = efforts.map((effort) => effort.id).filter((id) => id !== "auto");
+  const concrete = efforts.map((effort) => effort.id);
   if (concrete.length === 0) return void 0;
-  if (!selected || selected === "auto") return concrete[0];
+  if (!selected) return concrete[0];
   const index = concrete.indexOf(selected);
   return index > 0 ? concrete[index - 1] : void 0;
 }
@@ -19153,23 +19265,26 @@ var WritingBuddySettingTab = class extends import_obsidian15.PluginSettingTab {
   renderNewConversationDefaults(containerEl) {
     for (const spec of this.newConversationDefaultRows()) this.dropdownRow(containerEl, spec);
   }
-  /** Connection → Provider → Model → Effort, each narrowing the next, then Context. */
+  /**
+   * Connection → Model → Effort, each narrowing the next, then Context.
+   *
+   * Provider has no row. Every Connection carries exactly one, so the row
+   * only ever repeated the Connection's name; it is derived here and stored
+   * with the Model, and the request contract still carries it.
+   */
   newConversationDefaultRows() {
     const defaults = this.plugin.deviceSettings.newConversationDefaults;
     const enabled = this.plugin.connectionRecords().filter((record3) => record3.connection.enabled);
     const capabilities = this.plugin.connectionCapabilities(defaults.connectionId);
-    const provider = capabilities.providers.find((item) => item.id === defaults.provider);
+    const provider = capabilities.providers.find((item) => item.id === defaults.provider) ?? soleProvider(capabilities);
     const models = provider?.models ?? [];
     const model = models.find((item) => item.id === defaults.model);
     const efforts = model?.efforts ?? provider?.efforts ?? [];
     const connectionOptions = { "": t("common.unset") };
     for (const record3 of enabled) connectionOptions[record3.connection.id] = record3.connection.name;
-    const providerOptions = { "": t("common.unset") };
-    for (const item of capabilities.providers) providerOptions[item.id] = providerDisplayName(item.id, item.label);
     const modelOptions2 = { "": t("common.unset") };
     for (const item of models) modelOptions2[item.id] = item.label ?? item.id;
-    const effortOptions2 = { "": efforts.length ? t("common.unset") : t("common.unsupported") };
-    if (efforts.length) effortOptions2.auto = t("composer.effortServerDefault");
+    const effortOptions2 = efforts.length ? {} : { "": t("common.unsupported") };
     for (const item of efforts) effortOptions2[item.id] = item.label ?? item.id;
     const contextOptions = {};
     for (const depth of CONTEXT_DEPTHS) contextOptions[depth.id] = contextDepthLabel(depth.id);
@@ -19198,36 +19313,20 @@ var WritingBuddySettingTab = class extends import_obsidian15.PluginSettingTab {
         }
       },
       {
-        key: "defaults.provider",
-        name: t("label.provider"),
-        desc: defaults.connectionId ? t("settings.defaults.providerDesc") : t("settings.defaults.selectConnectionFirst"),
-        options: providerOptions,
-        value: defaults.provider ?? "",
-        disabled: !defaults.connectionId,
-        onChange: async (providerId) => {
-          await this.plugin.setNewConversationDefaults({
-            ...this.plugin.deviceSettings.newConversationDefaults,
-            provider: providerId || void 0,
-            model: void 0,
-            effort: void 0
-          });
-          this.rerender();
-        }
-      },
-      {
         key: "defaults.model",
         name: t("label.model"),
-        desc: defaults.provider ? t("settings.defaults.modelDesc") : t("settings.defaults.selectProviderFirst"),
+        desc: defaults.connectionId ? t("settings.defaults.modelDesc") : t("settings.defaults.selectConnectionFirst"),
         options: modelOptions2,
         value: defaults.model ?? "",
-        disabled: !defaults.provider,
+        disabled: !defaults.connectionId || !provider,
         onChange: async (modelId) => {
           const selectedModel = models.find((item) => item.id === modelId);
           const selectedEfforts = selectedModel?.efforts ?? provider?.efforts ?? [];
           await this.plugin.setNewConversationDefaults({
             ...this.plugin.deviceSettings.newConversationDefaults,
+            provider: modelId ? provider?.id : void 0,
             model: modelId || void 0,
-            effort: modelId && selectedEfforts.length > 0 ? "auto" : void 0
+            effort: modelId ? defaultEffortFor(selectedEfforts) : void 0
           });
           this.rerender();
         }
@@ -19237,7 +19336,7 @@ var WritingBuddySettingTab = class extends import_obsidian15.PluginSettingTab {
         name: t("label.effort"),
         desc: defaults.model ? efforts.length ? t("settings.defaults.effortDesc") : t("settings.defaults.effortUnsupported") : t("settings.defaults.selectModelFirst"),
         options: effortOptions2,
-        value: defaults.effort ?? "",
+        value: resolveEffort(defaults.effort, efforts) ?? "",
         disabled: !defaults.model || efforts.length === 0,
         onChange: async (effort) => {
           await this.plugin.setNewConversationDefaults({
@@ -19645,6 +19744,9 @@ function findScroller(from) {
   }
   return null;
 }
+function soleProvider(capabilities) {
+  return capabilities.providers.length === 1 ? capabilities.providers[0] : void 0;
+}
 
 // src/backend/streaming.ts
 var MAX_REPLY_CHARS = 2e6;
@@ -19908,8 +20010,12 @@ var DirectAPIBackend = class {
   async getCapabilities() {
     const models = await this.discoverModels();
     const provider = this.connection.config.provider;
-    const mapped = models.map((model) => ({ id: model.id, efforts: directEfforts(provider, model.id, model.efforts) }));
-    const efforts = uniqueEfforts(mapped.flatMap((model) => model.efforts ?? []));
+    const mapped = models.map((model) => {
+      const efforts2 = directEfforts(provider, model.id, model.efforts, model.defaultEffort);
+      const defaultEffort = efforts2.find((effort) => effort.default)?.id;
+      return { id: model.id, efforts: efforts2, ...defaultEffort ? { defaultEffort } : {} };
+    });
+    const efforts = uniqueEfforts(mapped.flatMap((model) => model.efforts));
     return {
       providers: [{
         id: provider,
@@ -20015,7 +20121,8 @@ var DirectAPIBackend = class {
       yield {
         type: "error",
         code: message === unsafeVaultPathMessage() ? "invalid_request" : isAuthError(message) ? "unauthorized" : "direct_api_error",
-        message
+        message,
+        ...error instanceof HttpStatusError ? { status: error.status } : {}
       };
     } finally {
       this.cancelled.delete(payload.requestId);
@@ -20170,10 +20277,11 @@ function completionRequest(provider, base, key, model, messages, instructions, e
     return {
       url: base + "/messages",
       headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: { model, max_tokens: 4096, ...instructions ? { system: instructions } : {}, messages }
+      body: { model, ...anthropicThinking(effort), ...instructions ? { system: instructions } : {}, messages }
     };
   }
   if (provider === "google") {
+    const thinkingConfig = googleThinkingConfig(effort);
     return {
       url: base + "/models/" + encodeURIComponent(model) + ":generateContent",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -20182,7 +20290,8 @@ function completionRequest(provider, base, key, model, messages, instructions, e
         contents: messages.map((message) => ({
           role: message.role === "assistant" ? "model" : "user",
           parts: [{ text: message.content }]
-        }))
+        })),
+        ...thinkingConfig ? { generationConfig: { thinkingConfig } } : {}
       }
     };
   }
@@ -20258,9 +20367,6 @@ function isOutputBudgetExhausted(reason) {
   const normalized = reason?.trim().toLowerCase().replace(/[\s-]+/g, "_");
   return normalized === "length" || normalized === "max_tokens";
 }
-function capitalize(value) {
-  return value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value;
-}
 function parseListedModel(provider, item) {
   if (typeof item === "string") return [{ id: item }];
   if (typeof item !== "object" || item === null) return [];
@@ -20268,13 +20374,16 @@ function parseListedModel(provider, item) {
   const rawId = record3.id ?? record3.name;
   if (typeof rawId !== "string") return [];
   const id = provider === "google" ? rawId.replace(/^models\//, "") : rawId;
-  const efforts = advertisedEfforts(record3) ?? advertisedEfforts(object(record3.capabilities));
-  return [efforts === void 0 ? { id } : { id, efforts }];
+  const capabilities = object(record3.capabilities);
+  const efforts = advertisedEfforts(record3) ?? advertisedEfforts(capabilities);
+  if (efforts === void 0) return [{ id }];
+  const defaultEffort = advertisedDefaultEffort(record3) ?? advertisedDefaultEffort(capabilities);
+  return [{ id, efforts, ...defaultEffort && efforts.includes(defaultEffort) ? { defaultEffort } : {} }];
 }
 function advertisedEfforts(record3) {
   const flag = record3.supports_reasoning_effort ?? record3.supportsReasoningEffort ?? record3.reasoning_effort;
   if (flag === false) return [];
-  for (const key of ["efforts", "effort_levels", "effortLevels", "reasoning_efforts", "reasoningEfforts", "supported_reasoning_efforts", "supported_reasoning_levels"]) {
+  for (const key of ["supported_reasoning_levels", "efforts", "effort_levels", "effortLevels", "reasoning_efforts", "reasoningEfforts", "supported_reasoning_efforts"]) {
     const value = record3[key];
     if (!Array.isArray(value)) continue;
     return value.flatMap((entry) => {
@@ -20283,21 +20392,30 @@ function advertisedEfforts(record3) {
       return typeof effort === "string" ? [effort] : [];
     });
   }
-  return flag === true ? DEFAULT_EFFORT_LADDER : void 0;
+  return flag === true ? fullEffortLadder().map((effort) => effort.id) : void 0;
 }
-var DEFAULT_EFFORT_LADDER = ["minimal", "low", "medium", "high"];
-function directEfforts(provider, model, advertised) {
-  if (advertised !== void 0) return advertised.map((id) => ({ id, label: capitalize(id) }));
-  if (provider !== "openai" && provider !== "openai-compatible") return [];
-  if (!isReasoningFamily(model)) return [];
-  return DEFAULT_EFFORT_LADDER.map((id) => ({ id, label: capitalize(id) }));
+function advertisedDefaultEffort(record3) {
+  for (const key of ["default_reasoning_level", "default_effort", "defaultEffort"]) {
+    const value = record3[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return void 0;
 }
-function isReasoningFamily(model) {
-  const bare = model.slice(model.lastIndexOf("/") + 1);
-  return /^(gpt-5|o[134])(?![a-z])/i.test(bare);
+function directEfforts(provider, model, advertised, advertisedDefault) {
+  if (advertised !== void 0) return advertisedEffortLadder(advertised, advertisedDefault);
+  switch (provider) {
+    case "openai":
+      return isOpenAIReasoningFamily(model) ? fullEffortLadder() : [];
+    case "openai-compatible":
+      return fullEffortLadder();
+    case "anthropic":
+      return isAnthropicThinkingFamily(model) ? fullEffortLadder() : [];
+    case "google":
+      return isGoogleThinkingFamily(model) ? fullEffortLadder() : [];
+  }
 }
 function uniqueEfforts(values) {
-  return [...new Map(values.map((value) => [value.id, value])).values()];
+  return [...new Map(values.map((value) => [value.id, { id: value.id }])).values()];
 }
 function describe(error) {
   return error instanceof Error ? error.message : String(error);
@@ -20309,15 +20427,21 @@ function isAuthError(error) {
   const value = describe(error);
   return value.includes("HTTP 401") || value.includes("HTTP 403") || value.includes("Authentication Error");
 }
+var HttpStatusError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+    this.name = "HttpStatusError";
+  }
+};
 async function httpError(response, credential) {
   const safe = redactCredential(response.text.slice(0, 200), credential);
-  return new Error("HTTP " + response.status + (safe ? "\uFF1A" + safe : ""));
+  return new HttpStatusError(response.status, "HTTP " + response.status + (safe ? "\uFF1A" + safe : ""));
 }
 
 // src/backend/LlamaCppBackend.ts
 var LOCAL_OPENAI_REQUEST_TIMEOUT_MS = 12e4;
 var DEFAULT_LOCAL_OPENAI_MODEL = "gemma4-12b-writing";
-var REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"];
 var LlamaCppBackend = class {
   displayName;
   apiBaseUrl;
@@ -20381,7 +20505,7 @@ var LlamaCppBackend = class {
       const uniqueModels = [...new Set(models.map((id) => id.trim()).filter(Boolean))];
       if (uniqueModels.length === 0) throw new Error(t("backend.localNoModels"));
       const props = await this.serverProps();
-      const efforts = props.supportsReasoningEffort ? REASONING_EFFORTS.map((id) => ({ id, label: id })) : [];
+      const efforts = props.supportsReasoningEffort ? fullEffortLadder() : [];
       return {
         providers: [{
           id: "local",
@@ -20709,8 +20833,10 @@ var OllamaBackend = class {
   }
   async getCapabilities() {
     const models = await this.models();
+    const levelled = await Promise.all(models.map(async (id) => isOllamaLevelledThinkingFamily(id) && await this.thinks(id)));
+    const mapped = models.map((id, index) => ({ id, efforts: levelled[index] ? fullEffortLadder() : [] }));
     return {
-      providers: [{ id: "local", label: "Local", models: models.map((id) => ({ id, efforts: [] })), efforts: [] }],
+      providers: [{ id: "local", label: "Local", models: mapped, efforts: mapped.some((model) => model.efforts.length > 0) ? fullEffortLadder() : [] }],
       modes: ["chat", "rewrite"],
       streaming: false
     };
@@ -20736,6 +20862,22 @@ var OllamaBackend = class {
       return typeof record3.name === "string" ? [record3.name] : [];
     }) : [];
   }
+  /** Whether `/api/show` lists `thinking` among the model's capabilities. A failed lookup counts as no. */
+  async thinks(model) {
+    try {
+      const response = await this.httpClient({
+        url: this.baseUrl + "/api/show",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model })
+      });
+      if (!response.ok) return false;
+      const capabilities = object3(response.json).capabilities;
+      return Array.isArray(capabilities) && capabilities.includes("thinking");
+    } catch {
+      return false;
+    }
+  }
   async *generate(payload, rewrite) {
     if (payload.provider !== "local") {
       yield { type: "error", code: "provider_unavailable", message: t("backend.providerNotOnConnection") };
@@ -20752,7 +20894,8 @@ var OllamaBackend = class {
     try {
       yield { type: "request.started", requestId: payload.requestId };
       const messages = rewrite ? rewriteMessages(payload) : adapterMessages(payload);
-      yield { type: "provider.selected", provider: "local", model: payload.model };
+      const think = isOllamaLevelledThinkingFamily(payload.model) ? ollamaThink(payload.effort) : void 0;
+      yield { type: "provider.selected", provider: "local", model: payload.model, ...think ? { effort: payload.effort ?? void 0 } : {} };
       const response = await this.httpClient({
         url: this.baseUrl + "/api/chat",
         method: "POST",
@@ -20761,7 +20904,8 @@ var OllamaBackend = class {
         body: JSON.stringify({
           model: payload.model,
           stream: false,
-          messages: withSystemMessage(adapterInstructions(payload), messages)
+          messages: withSystemMessage(adapterInstructions(payload), messages),
+          ...think ? { think } : {}
         })
       });
       if (!response.ok) throw new Error("Ollama HTTP " + response.status + "\uFF1A" + response.text.slice(0, 200));
@@ -20792,6 +20936,7 @@ var OllamaBackend = class {
         metadata: {
           provider: "local",
           model: payload.model,
+          ...think && payload.effort ? { effort: payload.effort } : {},
           ...Object.keys(usage).length > 0 ? { usage } : {}
         }
       };
@@ -20992,7 +21137,7 @@ var RoutingAIBackend = class {
     }
     this.requests.set(payload.requestId, backend);
     try {
-      const routed = payload.effort === "auto" ? { ...payload, effort: null } : payload;
+      const routed = offersEffort(this.registry.getCapabilities(payload.connectionId), payload) ? payload : { ...payload, effort: null };
       const stream = rewrite ? backend.rewrite(routed) : backend.chat(routed);
       for await (const event of stream) yield event;
     } finally {
@@ -21009,15 +21154,23 @@ function validateSelection(capabilities, payload) {
   const model = provider.models.find((item) => item.id === payload.model);
   if (!model) return { code: "model_unavailable", message: "\u6240\u9009 Model \u4E0D\u5C5E\u4E8E\u8FD9\u4E2A Provider\u3002" };
   const efforts = model.efforts ?? provider.efforts;
-  if (efforts.length > 0 && !payload.effort) return { code: "effort_required", message: "\u53D1\u9001\u524D\u8BF7\u9009\u62E9 Effort\u3002" };
-  if (payload.effort && payload.effort !== "auto" && !efforts.some((item) => item.id === payload.effort)) {
-    return { code: "effort_unavailable", message: efforts.length === 0 ? "\u6240\u9009 Model \u4E0D\u652F\u6301 Effort\u3002" : "\u6240\u9009 Effort \u4E0D\u5C5E\u4E8E\u8FD9\u4E2A Model\u3002" };
-  }
+  if (efforts.length === 0) return null;
+  if (!payload.effort) return { code: "effort_required", message: "\u53D1\u9001\u524D\u8BF7\u9009\u62E9 Effort\u3002" };
+  if (!efforts.some((item) => item.id === payload.effort)) return { code: "effort_unavailable", message: "\u6240\u9009 Effort \u4E0D\u5C5E\u4E8E\u8FD9\u4E2A Model\u3002" };
   return null;
 }
+function offersEffort(capabilities, payload) {
+  if (capabilities.providers.length === 0) return true;
+  const provider = capabilities.providers.find((item) => item.id === payload.provider);
+  const model = provider?.models.find((item) => item.id === payload.model);
+  return (model?.efforts ?? provider?.efforts ?? []).length > 0;
+}
 function healthFromError(event) {
-  const auth = event.code === "unauthorized" || event.code === "token_expired";
-  return { kind: auth ? "auth-error" : event.code === "rate_limited" ? "unavailable" : "offline", detail: event.message, lastChecked: (/* @__PURE__ */ new Date()).toISOString() };
+  const now2 = (/* @__PURE__ */ new Date()).toISOString();
+  if (event.code === "unauthorized" || event.code === "token_expired") return { kind: "auth-error", detail: event.message, lastChecked: now2 };
+  if (event.code === "rate_limited" || event.status === 429) return { kind: "unavailable", detail: event.message, lastChecked: now2 };
+  if (event.status !== void 0) return { kind: "connected", lastChecked: now2 };
+  return { kind: "offline", detail: event.message, lastChecked: now2 };
 }
 function isClientRequestError(code) {
   return code === "invalid_request" || code === "connection_unavailable" || code === "provider_required" || code === "model_required" || code === "effort_required" || code === "provider_unavailable" || code === "model_unavailable" || code === "effort_unavailable" || code === "local_busy" || code === "output_budget_exhausted" || code === "direct_api_empty_response" || code === "local_empty_response" || code === "cancelled";

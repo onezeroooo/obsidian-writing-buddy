@@ -2,6 +2,7 @@ import type {
 	AIBackend,
 	AIEvent,
 	Capabilities,
+	EffortCapability,
 	HealthResult,
 	RewritePayload,
 	TurnPayload,
@@ -13,6 +14,15 @@ import { adapterInstructions, adapterMessages, rewriteMessages, withSystemMessag
 import { fetchHttpClient, type HttpClient } from "./HttpClient";
 import { MAX_REPLY_CHARS, ReplyTooLargeError, StreamInterruptedError, StreamUnavailableError, isEventStream, sseData, type StreamClient } from "./streaming";
 import { redactCredential } from "../auth/redact";
+import {
+	advertisedEffortLadder,
+	anthropicThinking,
+	fullEffortLadder,
+	googleThinkingConfig,
+	isAnthropicThinkingFamily,
+	isGoogleThinkingFamily,
+	isOpenAIReasoningFamily,
+} from "./effort";
 import { unsafeVaultPathMessage } from "./safePath";
 import { t } from "../i18n";
 
@@ -36,10 +46,12 @@ interface Completion {
  * One entry of a model listing. `efforts` is what the endpoint said about
  * reasoning effort for this model: a ladder it advertised, an empty list when
  * it explicitly declared none, and `undefined` when it said nothing at all.
+ * `defaultEffort` is the level it named as the model's default, if any.
  */
 export interface DiscoveredModel {
 	id: string;
 	efforts?: string[];
+	defaultEffort?: string;
 }
 
 export class DirectAPIBackend implements AIBackend {
@@ -76,8 +88,12 @@ export class DirectAPIBackend implements AIBackend {
 	async getCapabilities(): Promise<Capabilities> {
 		const models = await this.discoverModels();
 		const provider = this.connection.config.provider;
-		const mapped = models.map((model) => ({ id: model.id, efforts: directEfforts(provider, model.id, model.efforts) }));
-		const efforts = uniqueEfforts(mapped.flatMap((model) => model.efforts ?? []));
+		const mapped = models.map((model) => {
+			const efforts = directEfforts(provider, model.id, model.efforts, model.defaultEffort);
+			const defaultEffort = efforts.find((effort) => effort.default)?.id;
+			return { id: model.id, efforts, ...(defaultEffort ? { defaultEffort } : {}) };
+		});
+		const efforts = uniqueEfforts(mapped.flatMap((model) => model.efforts));
 		// A direct connection carries exactly one provider, and the writer knows
 		// it by the name they gave the connection — "Tidewire", not the adapter.
 		return {
@@ -195,6 +211,7 @@ export class DirectAPIBackend implements AIBackend {
 				type: "error",
 				code: message === unsafeVaultPathMessage() ? "invalid_request" : isAuthError(message) ? "unauthorized" : "direct_api_error",
 				message,
+				...(error instanceof HttpStatusError ? { status: error.status } : {}),
 			};
 		} finally {
 			this.cancelled.delete(payload.requestId);
@@ -379,13 +396,17 @@ function completionRequest(
 	effort: string | null,
 ): { url: string; headers: Record<string, string>; body: unknown } {
 	if (provider === "anthropic") {
+		// Effort is a thinking budget here, and `max_tokens` must leave room for
+		// the answer above it. Thinking blocks in the reply are not text and are
+		// dropped by the parsers; only the answer reaches the writer.
 		return {
 			url: base + "/messages",
 			headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-			body: { model, max_tokens: 4096, ...(instructions ? { system: instructions } : {}), messages },
+			body: { model, ...anthropicThinking(effort), ...(instructions ? { system: instructions } : {}), messages },
 		};
 	}
 	if (provider === "google") {
+		const thinkingConfig = googleThinkingConfig(effort);
 		return {
 			url: base + "/models/" + encodeURIComponent(model) + ":generateContent",
 			headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -395,6 +416,7 @@ function completionRequest(
 					role: message.role === "assistant" ? "model" : "user",
 					parts: [{ text: message.content }],
 				})),
+				...(thinkingConfig ? { generationConfig: { thinkingConfig } } : {}),
 			},
 		};
 	}
@@ -466,16 +488,15 @@ function isOutputBudgetExhausted(reason: string | undefined): boolean {
 	const normalized = reason?.trim().toLowerCase().replace(/[\s-]+/g, "_");
 	return normalized === "length" || normalized === "max_tokens";
 }
-function capitalize(value: string): string { return value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value; }
-
 /**
  * One listed model, with whatever it said about reasoning effort.
  *
  * The OpenAI listing format carries no capability fields, so most entries
- * come back with `efforts` undefined and the family rule below decides. An
+ * come back with `efforts` undefined and the ladder rule below decides. An
  * endpoint that does describe its models is believed instead: a ladder under
- * any of the field names in use (`efforts`, `effort_levels`, `effortLevels`,
- * `reasoning_efforts`, `supported_reasoning_levels[].effort`, or the same
+ * OpenAI's own catalogue name (`supported_reasoning_levels[].effort`, with
+ * `default_reasoning_level`) or one of the other field names in use
+ * (`efforts`, `effort_levels`, `effortLevels`, `reasoning_efforts`, or the same
  * inside a `capabilities` object) becomes the ladder offered, and an explicit
  * `supports_reasoning_effort: false` (or an empty ladder) means none.
  */
@@ -486,14 +507,17 @@ export function parseListedModel(provider: DirectAPIProvider, item: unknown): Di
 	const rawId = record.id ?? record.name;
 	if (typeof rawId !== "string") return [];
 	const id = provider === "google" ? rawId.replace(/^models\//, "") : rawId;
-	const efforts = advertisedEfforts(record) ?? advertisedEfforts(object(record.capabilities));
-	return [efforts === undefined ? { id } : { id, efforts }];
+	const capabilities = object(record.capabilities);
+	const efforts = advertisedEfforts(record) ?? advertisedEfforts(capabilities);
+	if (efforts === undefined) return [{ id }];
+	const defaultEffort = advertisedDefaultEffort(record) ?? advertisedDefaultEffort(capabilities);
+	return [{ id, efforts, ...(defaultEffort && efforts.includes(defaultEffort) ? { defaultEffort } : {}) }];
 }
 
 function advertisedEfforts(record: Record<string, unknown>): string[] | undefined {
 	const flag = record.supports_reasoning_effort ?? record.supportsReasoningEffort ?? record.reasoning_effort;
 	if (flag === false) return [];
-	for (const key of ["efforts", "effort_levels", "effortLevels", "reasoning_efforts", "reasoningEfforts", "supported_reasoning_efforts", "supported_reasoning_levels"]) {
+	for (const key of ["supported_reasoning_levels", "efforts", "effort_levels", "effortLevels", "reasoning_efforts", "reasoningEfforts", "supported_reasoning_efforts"]) {
 		const value = record[key];
 		if (!Array.isArray(value)) continue;
 		return value.flatMap((entry) => {
@@ -502,37 +526,46 @@ function advertisedEfforts(record: Record<string, unknown>): string[] | undefine
 			return typeof effort === "string" ? [effort] : [];
 		});
 	}
-	return flag === true ? DEFAULT_EFFORT_LADDER : undefined;
+	return flag === true ? fullEffortLadder().map((effort) => effort.id) : undefined;
 }
 
-const DEFAULT_EFFORT_LADDER = ["minimal", "low", "medium", "high"];
+function advertisedDefaultEffort(record: Record<string, unknown>): string | undefined {
+	for (const key of ["default_reasoning_level", "default_effort", "defaultEffort"]) {
+		const value = record[key];
+		if (typeof value === "string" && value.length > 0) return value;
+	}
+	return undefined;
+}
 
 /**
- * Whether a model takes `reasoning_effort`, and which values.
+ * The effort ladder a model is offered.
  *
- * What the endpoint advertised wins. Without that, a model of a reasoning
- * family (GPT-5, o1, o3, o4 — also behind a vendor prefix such as
- * `openai/gpt-5`) gets the standard ladder on OpenAI and on any
- * OpenAI-compatible endpoint, since a gateway or router that fronts those
- * models passes the field through. Everything else is offered no effort:
- * a compatible endpoint is not assumed to understand the field just because
- * it speaks the protocol. Anthropic and Google use other mechanisms.
+ * What the endpoint advertised wins. Without that, the ladder is the same
+ * six words everywhere the vendor has a reasoning control: OpenAI's own
+ * reasoning families, every model on an OpenAI-compatible endpoint (a
+ * gateway fronts models the plugin cannot name, and passes the field
+ * through), Claude models with extended thinking and Gemini models with a
+ * thinking budget. A model documented not to take the control — GPT-4-era
+ * OpenAI models, Claude 3.5 and earlier, Gemini 2.0 and earlier — is
+ * offered none, so a request to it never carries a field it would refuse.
  */
-export function directEfforts(provider: DirectAPIProvider, model: string, advertised?: string[]): Array<{ id: string; label: string }> {
-	if (advertised !== undefined) return advertised.map((id) => ({ id, label: capitalize(id) }));
-	if (provider !== "openai" && provider !== "openai-compatible") return [];
-	if (!isReasoningFamily(model)) return [];
-	return DEFAULT_EFFORT_LADDER.map((id) => ({ id, label: capitalize(id) }));
+export function directEfforts(provider: DirectAPIProvider, model: string, advertised?: string[], advertisedDefault?: string): EffortCapability[] {
+	if (advertised !== undefined) return advertisedEffortLadder(advertised, advertisedDefault);
+	switch (provider) {
+		case "openai": return isOpenAIReasoningFamily(model) ? fullEffortLadder() : [];
+		case "openai-compatible": return fullEffortLadder();
+		case "anthropic": return isAnthropicThinkingFamily(model) ? fullEffortLadder() : [];
+		case "google": return isGoogleThinkingFamily(model) ? fullEffortLadder() : [];
+	}
 }
-
-function isReasoningFamily(model: string): boolean {
-	const bare = model.slice(model.lastIndexOf("/") + 1);
-	return /^(gpt-5|o[134])(?![a-z])/i.test(bare);
-}
-function uniqueEfforts(values: Array<{ id: string; label: string }>): Array<{ id: string; label: string }> {
-	return [...new Map(values.map((value) => [value.id, value])).values()];
+function uniqueEfforts(values: EffortCapability[]): EffortCapability[] {
+	return [...new Map(values.map((value) => [value.id, { id: value.id }])).values()];
 }
 function describe(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 function isAbortError(error: unknown): boolean { return error instanceof Error && error.name === "AbortError"; }
 function isAuthError(error: unknown): boolean { const value = describe(error); return value.includes("HTTP 401") || value.includes("HTTP 403") || value.includes("Authentication Error"); }
-async function httpError(response: { status: number; text: string }, credential: string): Promise<Error> { const safe = redactCredential(response.text.slice(0, 200), credential); return new Error("HTTP " + response.status + (safe ? "：" + safe : "")); }
+/** The endpoint answered, and said no. Carries the status so health can tell an answer from silence. */
+class HttpStatusError extends Error {
+	constructor(readonly status: number, message: string) { super(message); this.name = "HttpStatusError"; }
+}
+async function httpError(response: { status: number; text: string }, credential: string): Promise<Error> { const safe = redactCredential(response.text.slice(0, 200), credential); return new HttpStatusError(response.status, "HTTP " + response.status + (safe ? "：" + safe : "")); }

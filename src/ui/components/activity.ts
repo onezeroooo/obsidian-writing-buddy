@@ -337,7 +337,7 @@ export function detailRows(details: ActivityDetails): DetailRow[] {
 	const ran = [
 		details.provider,
 		details.model,
-		details.effort ? `Effort ${displayName(details.effort)}` : undefined,
+		details.effort ? `Effort ${details.effort}` : undefined,
 	].filter(
 		(part): part is string => Boolean(part),
 	);
@@ -481,11 +481,6 @@ function connectionTypeName(value: string): string {
 	if (value === "direct-api") return "Direct API";
 	if (value === "local") return "Local";
 	return value;
-}
-
-/** Runtime ids are lowercase; facts use the same title-style labels as controls. */
-function displayName(value: string): string {
-	return value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
 /** `2,889`. Thousands separators, because these are numbers to be read. */
