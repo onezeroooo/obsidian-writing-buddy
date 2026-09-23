@@ -233,7 +233,7 @@ export class DirectAPIBackend implements AIBackend {
 		const request = modelRequest(provider, base, this.connection.config.apiKey);
 		const response = await this.httpClient({ url: request.url, headers: request.headers });
 		if (!response.ok) throw await httpError(response, this.connection.config.apiKey);
-		const raw = response.json as Record<string, unknown>;
+		const raw = object(response.json);
 		const list = provider === "google" ? raw.models : raw.data;
 		if (!Array.isArray(list)) return [];
 		const discovered = list.flatMap((item) => parseListedModel(provider, item));

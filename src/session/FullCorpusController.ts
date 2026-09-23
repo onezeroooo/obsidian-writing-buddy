@@ -88,10 +88,14 @@ const REDUCTION_MIN_SHRINK = 0.9;
 /**
  * Rate-limit back-off. Bounded on every axis: a fixed number of attempts, a
  * ceiling on any single wait, and the run's own deadline over all of it.
+ *
+ * A subscription quota (ChatGPT through a gateway) does not clear in seconds:
+ * on 2026-09-23 a 49-batch run read the whole book and then died to one 429
+ * nine reductions in, after about two million tokens. When the server names
+ * no wait, the schedule climbs to minutes; when it names one, that wins.
  */
-const RATE_LIMIT_RETRIES = 3;
-const DEFAULT_RATE_LIMIT_WAIT_SECONDS = 10;
-const MAX_RATE_LIMIT_WAIT_MS = 60_000;
+const RATE_LIMIT_WAITS_SECONDS = [30, 60, 120, 240, 300] as const;
+const MAX_RATE_LIMIT_WAIT_MS = 300_000;
 /**
  * Transport back-off. A dropped connection is the failure measured to end a
  * Full run in practice: on 2026-09-04 four of five attempts on a 47-batch
@@ -243,6 +247,8 @@ interface CallOutcome {
 	errorCode?: string;
 	/** Seconds the server asked us to wait, when it said so. */
 	retryAfterSec?: number;
+	/** The HTTP status the endpoint answered with; absent when it never answered. */
+	status?: number;
 	cancelled: boolean;
 	deadlineExceeded: boolean;
 	failureReason?: FullCorpusFailureReason;
@@ -546,18 +552,20 @@ export class FullCorpusController {
 				documents: memoDocuments(memos, level + 1),
 				...(instructionPayload ? { skill: instructionPayload } : {}),
 			};
-			let finalOutcome = await this.call(job, requestIds, finalInput, aggregateMetadata, aggregateFacts);
+			let finalOutcome = await this.callWithBackoff(job, requestIds, finalInput, aggregateMetadata, aggregateFacts);
 			if (finalOutcome.ok) finalOutcome.text = normalizeCitationRanges(finalOutcome.text, finalAllowedIds);
 			let citationProblem = finalOutcome.ok ? finalCitationProblem(finalOutcome.text, finalAllowedIds, true) : null;
-			if (!finalOutcome.ok || citationProblem) {
+			// A final call that already waited out its rate limit or dropped
+			// connection will not be rescued by a second prompt; the memos below
+			// are the answer the writer can still have.
+			if ((!finalOutcome.ok && recoverableFailure(finalOutcome) === null) || citationProblem) {
 				this.throwIfStopped(job);
-				finalOutcome = await this.call(job, requestIds, {
+				finalOutcome = await this.callWithBackoff(job, requestIds, {
 					conversationId: options.session.id, preferences,
 					messages: messagesForStage(baseMessages, finalRecoveryPrompt(citationProblem ?? finalOutcome.error, job.softDeadlineReached)),
 					documents: memoDocuments(memos, level + 1),
 					...(instructionPayload ? { skill: instructionPayload } : {}),
-				}, aggregateMetadata, aggregateFacts, undefined,
-				options.finalRetryEffort);
+				}, aggregateMetadata, aggregateFacts, options.finalRetryEffort);
 				if (finalOutcome.ok) finalOutcome.text = normalizeCitationRanges(finalOutcome.text, finalAllowedIds);
 				citationProblem = finalOutcome.ok ? finalCitationProblem(finalOutcome.text, finalAllowedIds, true) : null;
 			}
@@ -676,12 +684,13 @@ export class FullCorpusController {
 	/**
 	 * Run one batch, waiting out the two failures a wait can fix.
 	 *
-	 * `rate_limited` is the one failure the server tells us how to recover
+	 * A rate limit is the one failure the server tells us how to recover
 	 * from: it names the seconds in `Retry-After` and in `details.retryAfterSec`
 	 * and, in this protocol, its `retryable: false` means "another provider
-	 * would not help" rather than "do not retry". `transport` is the one the
-	 * measurements say actually ends runs: a connection that dropped mid-call,
+	 * would not help" rather than "do not retry". A transport failure is the one
+	 * the measurements say actually ends runs: a connection that dropped mid-call,
 	 * for which the only cure is to place the call again after a short wait.
+	 * `recoverableFailure` recognises both whichever backend reported them.
 	 * Abandoning twenty minutes of completed batches over either would be a
 	 * poor trade.
 	 *
@@ -700,17 +709,19 @@ export class FullCorpusController {
 		input: Parameters<FullCorpusController["call"]>[2],
 		aggregateMetadata: GenerationMetadata,
 		aggregateFacts: TurnFacts,
+		effortOverride?: string | null,
 	): Promise<CallOutcome> {
-		let outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts);
+		let outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts, undefined, effortOverride);
 		let rateLimitRetries = 0;
 		let transportRetries = 0;
 		while (!outcome.ok) {
 			let waitMs: number;
-			if (outcome.errorCode === "rate_limited" && rateLimitRetries < RATE_LIMIT_RETRIES) {
+			const kind = recoverableFailure(outcome);
+			if (kind === "rate-limit" && rateLimitRetries < RATE_LIMIT_WAITS_SECONDS.length) {
+				const seconds = outcome.retryAfterSec ?? RATE_LIMIT_WAITS_SECONDS[rateLimitRetries];
 				rateLimitRetries += 1;
-				const seconds = outcome.retryAfterSec ?? DEFAULT_RATE_LIMIT_WAIT_SECONDS;
 				waitMs = Math.min(seconds * 1_000, MAX_RATE_LIMIT_WAIT_MS);
-			} else if (outcome.errorCode === "transport" && transportRetries < TRANSPORT_RETRY_WAITS_MS.length) {
+			} else if (kind === "transport" && transportRetries < TRANSPORT_RETRY_WAITS_MS.length) {
 				waitMs = TRANSPORT_RETRY_WAITS_MS[transportRetries];
 				transportRetries += 1;
 			} else {
@@ -721,7 +732,7 @@ export class FullCorpusController {
 			if (this.now() + waitMs >= job.deadlineAt) return outcome;
 			await this.sleep(waitMs, job.abortController.signal);
 			this.throwIfStopped(job);
-			outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts);
+			outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts, undefined, effortOverride);
 		}
 		return outcome;
 	}
@@ -819,8 +830,13 @@ export class FullCorpusController {
 		if (outcome.failureReason) metadata.errorCode = outcome.failureReason;
 		else if (outcome.errorCode) metadata.errorCode = outcome.errorCode;
 		metadata.contextReport = reportFor(options, snapshot, coverage, []);
+		// Every finished batch and reduction is cached by its exact input, so the
+		// writer should know that Continue does not pay for them again.
+		const saved = completedBatchIndexes.size > 0 && outcome.failureReason !== "resume-mismatch"
+			? t("corpus.savedForContinue", { done: completedBatchIndexes.size, total: snapshot.batches.length })
+			: "";
 		return {
-			ok: false, error: `${prefix}：${outcome.error ?? t("session.incompleteResult")}`,
+			ok: false, error: `${prefix}：${outcome.error ?? t("session.incompleteResult")}${saved}`,
 			metadata: { ...metadata }, coverage, requestIds, ...(resumeKey ? { resumeKey } : {}),
 			...(outcome.failureReason ? { failureReason: outcome.failureReason } : {}),
 		};
@@ -875,6 +891,7 @@ async function consume(
 	let error: string | undefined;
 	let errorCode: string | undefined;
 	let retryAfterSec: number | undefined;
+	let status: number | undefined;
 	const metadata: GenerationMetadata = {};
 	const facts: TurnFacts = {};
 	const iterator = stream[Symbol.asyncIterator]();
@@ -917,6 +934,7 @@ async function consume(
 				case "error":
 					errorCode = event.code;
 					retryAfterSec = event.retryAfterSec;
+					status = event.status;
 					error = describeError(event.code, event.message);
 					break;
 				case "request.started":
@@ -941,6 +959,7 @@ async function consume(
 	if (error) return {
 		ok: false, text: "", metadata, facts, error, ...(errorCode ? { errorCode } : {}),
 		...(retryAfterSec !== undefined ? { retryAfterSec } : {}),
+		...(status !== undefined ? { status } : {}),
 		cancelled: false, deadlineExceeded: false,
 	};
 	const text = nonBlank(resultText) ?? nonBlank(streamed);
@@ -950,6 +969,27 @@ async function consume(
 	};
 	onDelta?.(text);
 	return { ok: true, text, metadata, facts, cancelled: false, deadlineExceeded: false };
+}
+
+/**
+ * Which wait, if any, can fix a failed call.
+ *
+ * The retired runtime named its failures `rate_limited` and `transport`; a
+ * direct connection reports every failure as `direct_api_error` and carries
+ * the HTTP status instead. Reading only the codes meant no direct run ever
+ * waited: one 429 or one timeout ended it. A 503 that names its wait is a
+ * gateway cooling a target down, which is a rate limit by another name; the
+ * other 5xx gateway answers and a call that got no answer at all (timeout,
+ * dropped connection, unreadable body) are transport.
+ */
+export function recoverableFailure(outcome: Pick<CallOutcome, "errorCode" | "status" | "retryAfterSec">): "rate-limit" | "transport" | null {
+	const { errorCode, status } = outcome;
+	if (errorCode === "rate_limited" || status === 429) return "rate-limit";
+	if (status === 503 && outcome.retryAfterSec !== undefined) return "rate-limit";
+	if (errorCode === "transport" || errorCode === "stream_interrupted") return "transport";
+	if (status === 500 || status === 502 || status === 503 || status === 504) return "transport";
+	if (errorCode === "direct_api_error" && status === undefined) return "transport";
+	return null;
 }
 
 function nextOrAbort<T>(

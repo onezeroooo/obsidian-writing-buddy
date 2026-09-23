@@ -361,6 +361,7 @@ export const zh = {
 	"corpus.reduceOverflow": "汇总层级超过安全上限。",
 	"corpus.reduceNotConverging": "全文汇总未能收敛，未生成全文结论",
 	"corpus.reduceInterrupted": "全文汇总中断，未生成全文结论",
+	"corpus.savedForContinue": "。已读完的 {done}/{total} 批已保存：正文和模型不变时，稍后点「继续」只补跑剩下的部分",
 	"corpus.noVerifiableCitations": "全文中间备忘没有保留任何可验证的原文引用。",
 	"corpus.finalNoEvidence": "全文最终汇总缺少可验证证据，未生成全文结论",
 	"corpus.memosPartial": "部分正文的分卷备忘，未汇总为全文结论：",

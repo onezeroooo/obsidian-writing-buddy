@@ -293,6 +293,7 @@ export const en: Record<keyof typeof zh, string> = {
 	"corpus.reduceOverflow": "The summary depth exceeded its safety limit.",
 	"corpus.reduceNotConverging": "The full-text summary did not converge; no whole-text conclusion was produced",
 	"corpus.reduceInterrupted": "The full-text summary was interrupted; no whole-text conclusion was produced",
+	"corpus.savedForContinue": ". The {done}/{total} batches already read are saved: with the same manuscript and model, Continue later runs only what is left",
 	"corpus.noVerifiableCitations": "The intermediate memos kept no verifiable citations to the text.",
 	"corpus.finalNoEvidence": "The final summary lacks verifiable evidence; no whole-text conclusion was produced",
 	"corpus.memosPartial": "Per-batch memos for part of the manuscript, not summarised into a full-manuscript conclusion:",

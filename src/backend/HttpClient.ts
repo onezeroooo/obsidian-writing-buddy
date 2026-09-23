@@ -25,8 +25,12 @@ export function fetchHttpClient(fetchImpl: typeof fetch = window.fetch.bind(wind
 			signal: request.signal,
 		});
 		const text = await response.text();
-		let json: unknown = null;
-		try { json = text ? JSON.parse(text) : null; } catch { /* caller sees text */ }
-		return { status: response.status, headers: response.headers, text, json, ok: response.ok };
+		return { status: response.status, headers: response.headers, text, json: parseJsonBody(text), ok: response.ok };
 	};
+}
+
+/** The body as JSON, or null when it is empty or not JSON; the caller still has the text and status. */
+export function parseJsonBody(text: string): unknown {
+	if (!text) return null;
+	try { return JSON.parse(text); } catch { return null; }
 }

@@ -64,7 +64,7 @@ import { EDIT_HISTORY_LIMIT } from "./storage/ProjectStore";
 import { fetchStreamClient } from "./backend/streaming";
 import { BackendRegistry, RoutingAIBackend } from "./connections/BackendRegistry";
 import { upsertConnection } from "./connections/schema";
-import type { HttpClient } from "./backend/HttpClient";
+import { parseJsonBody, type HttpClient } from "./backend/HttpClient";
 import type { AIConnection, ConnectionRecord } from "./connections/types";
 import { connectionSnapshot } from "./connections/types";
 import { activateOrOpenFileLeaf } from "./navigation/fileLeaf";
@@ -1572,11 +1572,15 @@ const obsidianHttpClient: HttpClient = async (request) => {
 		body: request.body,
 		throw: false,
 	});
+	// `response.json` is a getter that throws on a body that is not JSON — a
+	// proxy's "Bad Gateway" page, say — which hid the status behind a parse
+	// error. Parse the text ourselves and let the caller report the status.
+	const text = response.text;
 	return {
 		status: response.status,
 		headers: new Headers(response.headers),
-		text: response.text,
-		json: response.json,
+		text,
+		json: parseJsonBody(text),
 		ok: response.status >= 200 && response.status < 300,
 	};
 };

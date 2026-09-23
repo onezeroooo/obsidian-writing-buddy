@@ -2484,6 +2484,7 @@ var en = {
   "corpus.reduceOverflow": "The summary depth exceeded its safety limit.",
   "corpus.reduceNotConverging": "The full-text summary did not converge; no whole-text conclusion was produced",
   "corpus.reduceInterrupted": "The full-text summary was interrupted; no whole-text conclusion was produced",
+  "corpus.savedForContinue": ". The {done}/{total} batches already read are saved: with the same manuscript and model, Continue later runs only what is left",
   "corpus.noVerifiableCitations": "The intermediate memos kept no verifiable citations to the text.",
   "corpus.finalNoEvidence": "The final summary lacks verifiable evidence; no whole-text conclusion was produced",
   "corpus.memosPartial": "Per-batch memos for part of the manuscript, not summarised into a full-manuscript conclusion:",
@@ -3284,6 +3285,7 @@ var zh = {
   "corpus.reduceOverflow": "\u6C47\u603B\u5C42\u7EA7\u8D85\u8FC7\u5B89\u5168\u4E0A\u9650\u3002",
   "corpus.reduceNotConverging": "\u5168\u6587\u6C47\u603B\u672A\u80FD\u6536\u655B\uFF0C\u672A\u751F\u6210\u5168\u6587\u7ED3\u8BBA",
   "corpus.reduceInterrupted": "\u5168\u6587\u6C47\u603B\u4E2D\u65AD\uFF0C\u672A\u751F\u6210\u5168\u6587\u7ED3\u8BBA",
+  "corpus.savedForContinue": "\u3002\u5DF2\u8BFB\u5B8C\u7684 {done}/{total} \u6279\u5DF2\u4FDD\u5B58\uFF1A\u6B63\u6587\u548C\u6A21\u578B\u4E0D\u53D8\u65F6\uFF0C\u7A0D\u540E\u70B9\u300C\u7EE7\u7EED\u300D\u53EA\u8865\u8DD1\u5269\u4E0B\u7684\u90E8\u5206",
   "corpus.noVerifiableCitations": "\u5168\u6587\u4E2D\u95F4\u5907\u5FD8\u6CA1\u6709\u4FDD\u7559\u4EFB\u4F55\u53EF\u9A8C\u8BC1\u7684\u539F\u6587\u5F15\u7528\u3002",
   "corpus.finalNoEvidence": "\u5168\u6587\u6700\u7EC8\u6C47\u603B\u7F3A\u5C11\u53EF\u9A8C\u8BC1\u8BC1\u636E\uFF0C\u672A\u751F\u6210\u5168\u6587\u7ED3\u8BBA",
   "corpus.memosPartial": "\u90E8\u5206\u6B63\u6587\u7684\u5206\u5377\u5907\u5FD8\uFF0C\u672A\u6C47\u603B\u4E3A\u5168\u6587\u7ED3\u8BBA\uFF1A",
@@ -18493,9 +18495,8 @@ var FINAL_SYNTHESIS_INPUT_CHARS = 48e3;
 var FINAL_SYNTHESIS_INPUT_ITEMS = 24;
 var FINAL_SYNTHESIS_HARD_CAP_CHARS = 15e4;
 var REDUCTION_MIN_SHRINK = 0.9;
-var RATE_LIMIT_RETRIES = 3;
-var DEFAULT_RATE_LIMIT_WAIT_SECONDS = 10;
-var MAX_RATE_LIMIT_WAIT_MS = 6e4;
+var RATE_LIMIT_WAITS_SECONDS = [30, 60, 120, 240, 300];
+var MAX_RATE_LIMIT_WAIT_MS = 3e5;
 var TRANSPORT_RETRY_WAITS_MS = [5e3, 15e3, 45e3];
 var REDUCTION_INPUT_ITEMS = 24;
 var MAX_REDUCTION_LEVELS = 10;
@@ -18813,26 +18814,18 @@ var FullCorpusController = class {
         documents: memoDocuments(memos, level + 1),
         ...instructionPayload ? { skill: instructionPayload } : {}
       };
-      let finalOutcome = await this.call(job, requestIds, finalInput, aggregateMetadata, aggregateFacts);
+      let finalOutcome = await this.callWithBackoff(job, requestIds, finalInput, aggregateMetadata, aggregateFacts);
       if (finalOutcome.ok) finalOutcome.text = normalizeCitationRanges(finalOutcome.text, finalAllowedIds);
       let citationProblem = finalOutcome.ok ? finalCitationProblem(finalOutcome.text, finalAllowedIds, true) : null;
-      if (!finalOutcome.ok || citationProblem) {
+      if (!finalOutcome.ok && recoverableFailure(finalOutcome) === null || citationProblem) {
         this.throwIfStopped(job);
-        finalOutcome = await this.call(
-          job,
-          requestIds,
-          {
-            conversationId: options.session.id,
-            preferences,
-            messages: messagesForStage(baseMessages, finalRecoveryPrompt(citationProblem ?? finalOutcome.error, job.softDeadlineReached)),
-            documents: memoDocuments(memos, level + 1),
-            ...instructionPayload ? { skill: instructionPayload } : {}
-          },
-          aggregateMetadata,
-          aggregateFacts,
-          void 0,
-          options.finalRetryEffort
-        );
+        finalOutcome = await this.callWithBackoff(job, requestIds, {
+          conversationId: options.session.id,
+          preferences,
+          messages: messagesForStage(baseMessages, finalRecoveryPrompt(citationProblem ?? finalOutcome.error, job.softDeadlineReached)),
+          documents: memoDocuments(memos, level + 1),
+          ...instructionPayload ? { skill: instructionPayload } : {}
+        }, aggregateMetadata, aggregateFacts, options.finalRetryEffort);
         if (finalOutcome.ok) finalOutcome.text = normalizeCitationRanges(finalOutcome.text, finalAllowedIds);
         citationProblem = finalOutcome.ok ? finalCitationProblem(finalOutcome.text, finalAllowedIds, true) : null;
       }
@@ -18960,12 +18953,13 @@ ${chosen}` : chosen,
   /**
    * Run one batch, waiting out the two failures a wait can fix.
    *
-   * `rate_limited` is the one failure the server tells us how to recover
+   * A rate limit is the one failure the server tells us how to recover
    * from: it names the seconds in `Retry-After` and in `details.retryAfterSec`
    * and, in this protocol, its `retryable: false` means "another provider
-   * would not help" rather than "do not retry". `transport` is the one the
-   * measurements say actually ends runs: a connection that dropped mid-call,
+   * would not help" rather than "do not retry". A transport failure is the one
+   * the measurements say actually ends runs: a connection that dropped mid-call,
    * for which the only cure is to place the call again after a short wait.
+   * `recoverableFailure` recognises both whichever backend reported them.
    * Abandoning twenty minutes of completed batches over either would be a
    * poor trade.
    *
@@ -18978,17 +18972,18 @@ ${chosen}` : chosen,
    * stops the moment that passes, so a wait cannot extend a run beyond it —
    * and every retry goes through `call`, so it counts against the call limit.
    */
-  async callWithBackoff(job, requestIds, input, aggregateMetadata, aggregateFacts) {
-    let outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts);
+  async callWithBackoff(job, requestIds, input, aggregateMetadata, aggregateFacts, effortOverride) {
+    let outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts, void 0, effortOverride);
     let rateLimitRetries = 0;
     let transportRetries = 0;
     while (!outcome.ok) {
       let waitMs;
-      if (outcome.errorCode === "rate_limited" && rateLimitRetries < RATE_LIMIT_RETRIES) {
+      const kind = recoverableFailure(outcome);
+      if (kind === "rate-limit" && rateLimitRetries < RATE_LIMIT_WAITS_SECONDS.length) {
+        const seconds = outcome.retryAfterSec ?? RATE_LIMIT_WAITS_SECONDS[rateLimitRetries];
         rateLimitRetries += 1;
-        const seconds = outcome.retryAfterSec ?? DEFAULT_RATE_LIMIT_WAIT_SECONDS;
         waitMs = Math.min(seconds * 1e3, MAX_RATE_LIMIT_WAIT_MS);
-      } else if (outcome.errorCode === "transport" && transportRetries < TRANSPORT_RETRY_WAITS_MS.length) {
+      } else if (kind === "transport" && transportRetries < TRANSPORT_RETRY_WAITS_MS.length) {
         waitMs = TRANSPORT_RETRY_WAITS_MS[transportRetries];
         transportRetries += 1;
       } else {
@@ -18997,7 +18992,7 @@ ${chosen}` : chosen,
       if (this.now() + waitMs >= job.deadlineAt) return outcome;
       await this.sleep(waitMs, job.abortController.signal);
       this.throwIfStopped(job);
-      outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts);
+      outcome = await this.call(job, requestIds, input, aggregateMetadata, aggregateFacts, void 0, effortOverride);
     }
     return outcome;
   }
@@ -19092,9 +19087,10 @@ ${chosen}` : chosen,
     if (outcome.failureReason) metadata2.errorCode = outcome.failureReason;
     else if (outcome.errorCode) metadata2.errorCode = outcome.errorCode;
     metadata2.contextReport = reportFor(options, snapshot, coverage, []);
+    const saved = completedBatchIndexes.size > 0 && outcome.failureReason !== "resume-mismatch" ? t("corpus.savedForContinue", { done: completedBatchIndexes.size, total: snapshot.batches.length }) : "";
     return {
       ok: false,
-      error: `${prefix}\uFF1A${outcome.error ?? t("session.incompleteResult")}`,
+      error: `${prefix}\uFF1A${outcome.error ?? t("session.incompleteResult")}${saved}`,
       metadata: { ...metadata2 },
       coverage,
       requestIds,
@@ -19146,6 +19142,7 @@ async function consume(stream, job, onDelta) {
   let error;
   let errorCode2;
   let retryAfterSec;
+  let status;
   const metadata2 = {};
   const facts = {};
   const iterator = stream[Symbol.asyncIterator]();
@@ -19188,6 +19185,7 @@ async function consume(stream, job, onDelta) {
         case "error":
           errorCode2 = event.code;
           retryAfterSec = event.retryAfterSec;
+          status = event.status;
           error = describeError(event.code, event.message);
           break;
         case "request.started":
@@ -19221,6 +19219,7 @@ async function consume(stream, job, onDelta) {
     error,
     ...errorCode2 ? { errorCode: errorCode2 } : {},
     ...retryAfterSec !== void 0 ? { retryAfterSec } : {},
+    ...status !== void 0 ? { status } : {},
     cancelled: false,
     deadlineExceeded: false
   };
@@ -19236,6 +19235,15 @@ async function consume(stream, job, onDelta) {
   };
   onDelta?.(text2);
   return { ok: true, text: text2, metadata: metadata2, facts, cancelled: false, deadlineExceeded: false };
+}
+function recoverableFailure(outcome) {
+  const { errorCode: errorCode2, status } = outcome;
+  if (errorCode2 === "rate_limited" || status === 429) return "rate-limit";
+  if (status === 503 && outcome.retryAfterSec !== void 0) return "rate-limit";
+  if (errorCode2 === "transport" || errorCode2 === "stream_interrupted") return "transport";
+  if (status === 500 || status === 502 || status === 503 || status === 504) return "transport";
+  if (errorCode2 === "direct_api_error" && status === void 0) return "transport";
+  return null;
 }
 function nextOrAbort(next, signal) {
   if (signal.aborted) return Promise.resolve(null);
@@ -30064,13 +30072,16 @@ function fetchHttpClient(fetchImpl = window.fetch.bind(window)) {
       signal: request.signal
     });
     const text2 = await response.text();
-    let json = null;
-    try {
-      json = text2 ? JSON.parse(text2) : null;
-    } catch {
-    }
-    return { status: response.status, headers: response.headers, text: text2, json, ok: response.ok };
+    return { status: response.status, headers: response.headers, text: text2, json: parseJsonBody(text2), ok: response.ok };
   };
+}
+function parseJsonBody(text2) {
+  if (!text2) return null;
+  try {
+    return JSON.parse(text2);
+  } catch {
+    return null;
+  }
 }
 
 // src/auth/redact.ts
@@ -30245,7 +30256,7 @@ var DirectAPIBackend = class {
     const request = modelRequest(provider, base, this.connection.config.apiKey);
     const response = await this.httpClient({ url: request.url, headers: request.headers });
     if (!response.ok) throw await httpError(response, this.connection.config.apiKey);
-    const raw = response.json;
+    const raw = object(response.json);
     const list = provider === "google" ? raw.models : raw.data;
     if (!Array.isArray(list)) return [];
     const discovered = list.flatMap((item) => parseListedModel(provider, item));
@@ -32926,11 +32937,12 @@ var obsidianHttpClient = async (request) => {
     body: request.body,
     throw: false
   });
+  const text2 = response.text;
   return {
     status: response.status,
     headers: new Headers(response.headers),
-    text: response.text,
-    json: response.json,
+    text: text2,
+    json: parseJsonBody(text2),
     ok: response.status >= 200 && response.status < 300
   };
 };
