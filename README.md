@@ -139,7 +139,7 @@ On mobile, the selected provider or endpoint must be reachable from the device. 
 
 ## Source and development
 
-Writing Buddy is open source under the MIT license. This public repository contains the product source for each released version, the files needed to build it, user documentation, and the distributed plugin artifacts.
+Writing Buddy is open source under the MIT license, except for the bundled memory kernel under `vendor/recanta/` (see [License](#license)). This public repository contains the product source for each released version, the files needed to build it, user documentation, and the distributed plugin artifacts.
 
 To build from source, use Node.js 20.19 or later and run:
 
@@ -153,4 +153,6 @@ Found a problem or have a suggestion? [Open an issue](https://github.com/onezero
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT, with one exception. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The files under `vendor/recanta/` are the built memory kernel the plugin bundles. They are the author’s own work, all rights reserved, and are **not** MIT: they may be read, built and redistributed verbatim as part of an unmodified Writing Buddy, and nothing else. Their terms are in [vendor/recanta/LICENSE](vendor/recanta/LICENSE).

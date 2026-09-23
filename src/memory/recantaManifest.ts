@@ -17,11 +17,13 @@ export interface RecantaManifest {
 	engine: string;
 	schemaVersion: number;
 	artifactFormat: number;
+	/** Hash over the vendored engine files this bundle was built from. */
+	vendor: string;
 	source: string;
 }
 
 declare const __WB_RECANTA__: RecantaManifest | undefined;
 
-const FALLBACK: RecantaManifest = { package: "recanta-dev", commit: "", version: "", engine: "recanta", schemaVersion: 0, artifactFormat: 0, source: "unbundled (tests)" };
+const FALLBACK: RecantaManifest = { package: "recanta-dev", commit: "", version: "", engine: "recanta", schemaVersion: 0, artifactFormat: 0, vendor: "", source: "unbundled (tests)" };
 
 export const RECANTA_MANIFEST: RecantaManifest = typeof __WB_RECANTA__ === "object" && __WB_RECANTA__ !== null ? __WB_RECANTA__ : FALLBACK;

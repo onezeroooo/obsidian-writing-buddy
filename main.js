@@ -57,7 +57,7 @@ var __toBinary = /* @__PURE__ */ (() => {
 var define_WB_RECANTA_default;
 var init_define_WB_RECANTA = __esm({
   "<define:__WB_RECANTA__>"() {
-    define_WB_RECANTA_default = { package: "recanta-dev", commit: "89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b", version: "0.1.0", engine: "recanta", schemaVersion: 6, artifactFormat: 1, source: "private build-time dependency; embedded into main.js, never installed or fetched at run time" };
+    define_WB_RECANTA_default = { package: "recanta-dev", commit: "89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b", version: "0.1.0", engine: "recanta", schemaVersion: 6, artifactFormat: 1, vendor: "sha256:7d52c8a58dca9de347f3a365df1278af1c7bdad6ea4f4f2195fd7a80326ad32e", source: "the author's own memory kernel, vendored into this repository under vendor/recanta and bundled into main.js; never installed, downloaded or updated at run time" };
   }
 });
 
@@ -6974,16 +6974,16 @@ function valuesText(values) {
 // src/memory/WritingBuddyRecantaAdapter.ts
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/index.js
+// vendor/recanta/dist/src/index.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/store/sqlite.js
+// vendor/recanta/dist/src/store/sqlite.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/store/driver.js
+// vendor/recanta/dist/src/store/driver.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/errors.js
+// vendor/recanta/dist/src/errors.js
 init_define_WB_RECANTA();
 var RecantaError = class extends Error {
   code;
@@ -6998,7 +6998,7 @@ function check(condition, code, message) {
     throw new RecantaError(code, message);
 }
 
-// node_modules/recanta-dev/dist/src/store/driver.js
+// vendor/recanta/dist/src/store/driver.js
 function openBuiltinSqlite(filename) {
   const process = globalThis.process;
   const module2 = typeof process?.getBuiltinModule === "function" ? process.getBuiltinModule("node:sqlite") : void 0;
@@ -7009,7 +7009,7 @@ function isSqlDatabase(value) {
   return typeof value === "object" && value !== null && typeof value.prepare === "function" && typeof value.exec === "function" && typeof value.close === "function";
 }
 
-// node_modules/recanta-dev/dist/src/runtime.js
+// vendor/recanta/dist/src/runtime.js
 init_define_WB_RECANTA();
 var encoder = new TextEncoder();
 function utf8Bytes(text2) {
@@ -7043,10 +7043,10 @@ function randomId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-// node_modules/recanta-dev/dist/src/validation.js
+// vendor/recanta/dist/src/validation.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/hash.js
+// vendor/recanta/dist/src/hash.js
 init_define_WB_RECANTA();
 var K = new Uint32Array([
   1116352408,
@@ -7175,7 +7175,7 @@ function sha256Hex(text2) {
   return hex;
 }
 
-// node_modules/recanta-dev/dist/src/validation.js
+// vendor/recanta/dist/src/validation.js
 var MAX_CONTENT_BYTES = 1048576;
 var kinds = /* @__PURE__ */ new Set(["message", "observation", "action_result", "state_change", "document_revision", "correction"]);
 function id(value) {
@@ -7246,10 +7246,10 @@ function hash(value) {
   return sha256Hex(value);
 }
 
-// node_modules/recanta-dev/dist/src/store/migrations.js
+// vendor/recanta/dist/src/store/migrations.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/memory/sqlite-claims.js
+// vendor/recanta/dist/src/memory/sqlite-claims.js
 init_define_WB_RECANTA();
 var CLAIM_SCHEMA = `
 CREATE TABLE claim_revisions (
@@ -7425,10 +7425,10 @@ var SqliteClaims = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/memory/sqlite-index.js
+// vendor/recanta/dist/src/memory/sqlite-index.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/retrieval/text.js
+// vendor/recanta/dist/src/retrieval/text.js
 init_define_WB_RECANTA();
 var TOKENIZER_PROBE = "\uFF32ecanta \uFF23\uFF21\uFF26\xC9 caf\xE9 \u5317\u4EAC\u5E02\u5929\u6C14 stra\xDFe \u0130stanbul \u01C5emal 12\uFF13 \u2460 na\xEFve r\xE9sum\xE9 \uFF71\uFF72\uFF73";
 var INDEX_VERSION = `paragraph-2048-lexical-v1:${sha256Hex(JSON.stringify(lexicalTerms(TOKENIZER_PROBE))).slice(0, 16)}`;
@@ -7638,7 +7638,7 @@ function passages(content) {
   return result;
 }
 
-// node_modules/recanta-dev/dist/src/memory/sqlite-index.js
+// vendor/recanta/dist/src/memory/sqlite-index.js
 var MEMORY_INDEX_SCHEMA = `
 CREATE TABLE memory_slots (
   namespace_id TEXT NOT NULL, scope_id TEXT NOT NULL, subject_id TEXT NOT NULL,
@@ -7676,7 +7676,7 @@ var MemoryIndex = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/processing/schema.js
+// vendor/recanta/dist/src/processing/schema.js
 init_define_WB_RECANTA();
 var PROCESSING_SCHEMA = `
 CREATE TABLE processing_sources (
@@ -7711,7 +7711,7 @@ CREATE INDEX decisions_claim ON processing_decisions(namespace_id,scope_id,claim
 CREATE INDEX decisions_slot ON processing_decisions(namespace_id,scope_id,subject_id,predicate);
 `;
 
-// node_modules/recanta-dev/dist/src/store/schema.js
+// vendor/recanta/dist/src/store/schema.js
 init_define_WB_RECANTA();
 var SCHEMA_VERSION = 6;
 var APPLICATION_ID = 1380270913;
@@ -7789,7 +7789,7 @@ CREATE TABLE artifact_ledger (
 ) STRICT;
 `;
 
-// node_modules/recanta-dev/dist/src/store/migrations.js
+// vendor/recanta/dist/src/store/migrations.js
 function migrate(db, index, rebuild = false) {
   const application = Number(db.prepare("PRAGMA application_id").get()?.application_id);
   let version = Number(db.prepare("PRAGMA user_version").get()?.user_version);
@@ -7842,7 +7842,7 @@ function migrate(db, index, rebuild = false) {
   index.initialize(false);
 }
 
-// node_modules/recanta-dev/dist/src/processing/supersede.js
+// vendor/recanta/dist/src/processing/supersede.js
 init_define_WB_RECANTA();
 function supersedeProcessing(db, evidenceId) {
   const rows = db.prepare("SELECT body FROM processing_runs WHERE evidence_id=? AND status<>'superseded'").all(evidenceId);
@@ -7856,7 +7856,7 @@ function supersedeProcessing(db, evidenceId) {
   }
 }
 
-// node_modules/recanta-dev/dist/src/host/documents.js
+// vendor/recanta/dist/src/host/documents.js
 init_define_WB_RECANTA();
 var DOCUMENT_STREAM = "documents";
 var documentEventId = (sourceId, revision) => `${sourceId}@${revision}`;
@@ -7930,7 +7930,7 @@ function latestRun(db, evidenceId) {
   return row ? { id: String(row.id), status: String(row.status) } : null;
 }
 
-// node_modules/recanta-dev/dist/src/retrieval/sqlite-index.js
+// vendor/recanta/dist/src/retrieval/sqlite-index.js
 init_define_WB_RECANTA();
 var SEARCH_SCHEMA = `
 CREATE TABLE passages (
@@ -8043,7 +8043,7 @@ var SqliteLexicalIndex = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/retrieval/sqlite-retrieval.js
+// vendor/recanta/dist/src/retrieval/sqlite-retrieval.js
 init_define_WB_RECANTA();
 var SqliteEvidenceRetrieval = class {
   #db;
@@ -8124,10 +8124,10 @@ var SqliteEvidenceRetrieval = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/context/sqlite-compiler.js
+// vendor/recanta/dist/src/context/sqlite-compiler.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/context/pack.js
+// vendor/recanta/dist/src/context/pack.js
 init_define_WB_RECANTA();
 function packContext(body, candidates, maxBytes, snapshot) {
   body.omittedSources = candidates.length;
@@ -8147,7 +8147,7 @@ function packContext(body, candidates, maxBytes, snapshot) {
   return { text: text2, bytes: utf8Length(text2), snapshot };
 }
 
-// node_modules/recanta-dev/dist/src/context/sqlite-compiler.js
+// vendor/recanta/dist/src/context/sqlite-compiler.js
 var SqliteContextCompiler = class {
   #db;
   #claims;
@@ -8204,7 +8204,7 @@ var SqliteContextCompiler = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/store/sqlite.js
+// vendor/recanta/dist/src/store/sqlite.js
 var placeholders = (values) => values.map(() => "?").join(",");
 function toEvidence(row) {
   return {
@@ -8451,13 +8451,13 @@ var SqliteEventStore = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/recanta.js
+// vendor/recanta/dist/src/recanta.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/processing/sqlite-processing.js
+// vendor/recanta/dist/src/processing/sqlite-processing.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/processing/reconcile.js
+// vendor/recanta/dist/src/processing/reconcile.js
 init_define_WB_RECANTA();
 function reconcile(candidate, run, state, origins, evidenceVersion, minimumConfidence, source = { sourceId: "", sourceVersion: 0 }) {
   const n = candidate.normalization;
@@ -8538,7 +8538,7 @@ function reconcile(candidate, run, state, origins, evidenceVersion, minimumConfi
   return { decision, write: { ...key, operationId: candidate.id, expectedRevision: state?.revision ?? 0, cardinality: "single", evidenceIds: [run.evidenceId], action: action2 } };
 }
 
-// node_modules/recanta-dev/dist/src/processing/sqlite-runs.js
+// vendor/recanta/dist/src/processing/sqlite-runs.js
 init_define_WB_RECANTA();
 var SqliteProcessingRuns = class {
   #db;
@@ -8662,7 +8662,7 @@ var SqliteProcessingRuns = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/processing/sqlite-processing.js
+// vendor/recanta/dist/src/processing/sqlite-processing.js
 var SqliteProcessing = class {
   #db;
   #store;
@@ -8820,13 +8820,13 @@ var SqliteProcessing = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/processing/coordinator.js
+// vendor/recanta/dist/src/processing/coordinator.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/processing/normalize.js
+// vendor/recanta/dist/src/processing/normalize.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/processing/dimensions.js
+// vendor/recanta/dist/src/processing/dimensions.js
 init_define_WB_RECANTA();
 var temporalPattern = /\b(?:currently|today|tomorrow|yesterday|next month|last month|before(?: \d{4}-\d{2}-\d{2})?|after(?: \d{4}-\d{2}-\d{2})?|\d{4}-\d{2}-\d{2})\b|下个月|上个月|明天|昨天|目前|今天/iu;
 function candidateDimensions(raw, evidence, metadata2) {
@@ -8893,7 +8893,7 @@ function candidateDimensions(raw, evidence, metadata2) {
   return { version: "candidate-dimensions-v1", qualifiers, temporal };
 }
 
-// node_modules/recanta-dev/dist/src/processing/normalize.js
+// vendor/recanta/dist/src/processing/normalize.js
 var NORMALIZER_VERSION = "generic-scalar-dimensions-v2";
 var canonicalMention = (value) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/gu, " ");
 var defaults = { "\u9884\u7B97": "budget", "\u559C\u6B22": "preference", "prefer": "preference", "prefers": "preference", "preference": "preference", "favourite color": "favorite color" };
@@ -8989,10 +8989,10 @@ function normalize(raw, index, run, evidence, aliases, method) {
   return { id: `${run.id}:${index}`, raw, dimensions, evidence: { evidenceId: evidence.id, sourceId: evidence.sourceId, sourceVersion: evidence.sourceVersion, contentHash: evidence.contentHash, start: raw.span.start, end: raw.span.end, offsetUnit: "utf16" }, extraction: { method, fingerprint: run.providerFingerprint }, normalization: { version: NORMALIZER_VERSION, subjectId, predicate: predicate || null, value, unit, ambiguities } };
 }
 
-// node_modules/recanta-dev/dist/src/processing/providers.js
+// vendor/recanta/dist/src/processing/providers.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/processing/validation.js
+// vendor/recanta/dist/src/processing/validation.js
 init_define_WB_RECANTA();
 function text(value, max = 4096, allowEmpty = false) {
   check(typeof value === "string" && (allowEmpty || value.trim().length > 0) && value.isWellFormed() && !value.includes("\0") && utf8Length(value) <= max, "INVALID_INPUT", "Invalid or oversized processing text.");
@@ -9162,7 +9162,7 @@ function usage(value) {
   return { ...value };
 }
 
-// node_modules/recanta-dev/dist/src/processing/providers.js
+// vendor/recanta/dist/src/processing/providers.js
 var RuleBasedProvider = class {
   fingerprint = "direct-statements-en-zh-v1";
   method = "rules";
@@ -9221,7 +9221,7 @@ var RuleBasedProvider = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/processing/coordinator.js
+// vendor/recanta/dist/src/processing/coordinator.js
 var ProcessingCoordinator = class {
   fingerprint;
   provider;
@@ -9312,13 +9312,13 @@ var ProcessingCoordinator = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/context/assembler.js
+// vendor/recanta/dist/src/context/assembler.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/retrieval/composition.js
+// vendor/recanta/dist/src/retrieval/composition.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/retrieval/rank.js
+// vendor/recanta/dist/src/retrieval/rank.js
 init_define_WB_RECANTA();
 var BM25 = { k1: 1.2, b: 0.75 };
 var RRF_K = 60;
@@ -9370,7 +9370,7 @@ function reciprocalRankFusion(lexical, dense) {
   return scores;
 }
 
-// node_modules/recanta-dev/dist/src/retrieval/composition.js
+// vendor/recanta/dist/src/retrieval/composition.js
 function rankBm25Candidates(db, namespaceId, scopes2, terms, options) {
   const rows = db.prepare("SELECT p.start,p.end,p.text,p.tokens,e.id,e.scope_id,e.source_id,e.source_version,e.content_hash FROM passages p JOIN evidence e ON e.id=p.evidence_id JOIN source_heads h ON h.evidence_id=e.id WHERE e.namespace_id=? AND e.scope_id IN (" + scopes2.map(() => "?").join(",") + ") AND h.deleted=0" + (options.positionBoundary === void 0 ? "" : " AND (h.position IS NULL OR h.position<=?)") + " ORDER BY e.version DESC,p.ordinal LIMIT ?").all(namespaceId, ...scopes2, ...options.positionBoundary === void 0 ? [] : [options.positionBoundary], options.maxCorpusPassages + 1);
   check(rows.length <= options.maxCorpusPassages, "NOT_READY", "Authorized corpus exceeds the configured exact-scan passage limit; narrow the scopes.");
@@ -9396,7 +9396,7 @@ function rankBm25Candidates(db, namespaceId, scopes2, terms, options) {
   };
 }
 
-// node_modules/recanta-dev/dist/src/context/budget.js
+// vendor/recanta/dist/src/context/budget.js
 init_define_WB_RECANTA();
 var ESTIMATED_UTF8_TOKEN_COUNTER = {
   fingerprint: "estimated-utf8-div3-v1",
@@ -9439,7 +9439,7 @@ function withinBudget(cost, budget) {
   return cost.bytes <= budget.maxBytes && (budget.maxTokens === void 0 || cost.tokens.value <= budget.maxTokens) && (budget.maxEstimatedTokens === void 0 || cost.tokens.value <= budget.maxEstimatedTokens);
 }
 
-// node_modules/recanta-dev/dist/src/context/render.js
+// vendor/recanta/dist/src/context/render.js
 init_define_WB_RECANTA();
 function renderContextPlan(result, budget, counter) {
   const plan = result.plan;
@@ -9457,7 +9457,7 @@ function renderContextPlan(result, budget, counter) {
   return { text: text2, bytes: cost.bytes, snapshot: result.snapshot };
 }
 
-// node_modules/recanta-dev/dist/src/context/assembler.js
+// vendor/recanta/dist/src/context/assembler.js
 var keyOf = ({ scopeId, subjectId, predicate }) => ({ scopeId, subjectId, predicate });
 var keyId = (key) => JSON.stringify([key.scopeId, key.subjectId, key.predicate]);
 var citationId = (citation) => JSON.stringify([citation.evidenceId, citation.contentHash, citation.start, citation.end, citation.offsetUnit]);
@@ -9786,14 +9786,14 @@ var ContextAssembler = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/retrieval/advanced.js
+// vendor/recanta/dist/src/retrieval/advanced.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/retrieval/advanced-contracts.js
+// vendor/recanta/dist/src/retrieval/advanced-contracts.js
 init_define_WB_RECANTA();
 var DEFAULT_MAX_CORPUS_PASSAGES = 2e3;
 
-// node_modules/recanta-dev/dist/src/retrieval/advanced.js
+// vendor/recanta/dist/src/retrieval/advanced.js
 var AdvancedRetrieval = class {
   #db;
   #store;
@@ -9892,7 +9892,7 @@ var AdvancedRetrieval = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/retrieval/episodes.js
+// vendor/recanta/dist/src/retrieval/episodes.js
 init_define_WB_RECANTA();
 var EpisodeRetrieval = class {
   #db;
@@ -9957,7 +9957,7 @@ var EpisodeRetrieval = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/inspector/inspect.js
+// vendor/recanta/dist/src/inspector/inspect.js
 init_define_WB_RECANTA();
 var MemoryInspector = class {
   #db;
@@ -9988,7 +9988,7 @@ var MemoryInspector = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/version.js
+// vendor/recanta/dist/src/version.js
 init_define_WB_RECANTA();
 var ENGINE_NAME = "recanta";
 var ENGINE_VERSION = "0.1.0";
@@ -10016,10 +10016,10 @@ var engineDescription = (indexVersion, acceleration) => ({
   capabilities: CAPABILITIES
 });
 
-// node_modules/recanta-dev/dist/src/portable/export.js
+// vendor/recanta/dist/src/portable/export.js
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/portable/format.js
+// vendor/recanta/dist/src/portable/format.js
 init_define_WB_RECANTA();
 function canonicalJson(value) {
   return JSON.stringify(sort(value));
@@ -10084,7 +10084,7 @@ function assertNoSecrets(text2) {
   check(!/"(?:apiKey|api_key|authorization|password|token)"\s*:/iu.test(text2), "INVALID_INPUT", "Refusing to export an artifact that appears to contain a credential field.");
 }
 
-// node_modules/recanta-dev/dist/src/portable/export.js
+// vendor/recanta/dist/src/portable/export.js
 var toEvidence2 = (row) => ({
   id: String(row.id),
   namespaceId: String(row.namespace_id),
@@ -10148,7 +10148,7 @@ function exportArtifacts(db, access, request) {
   return { artifacts, version, counts };
 }
 
-// node_modules/recanta-dev/dist/src/portable/import.js
+// vendor/recanta/dist/src/portable/import.js
 init_define_WB_RECANTA();
 var Skip = class extends Error {
   reason;
@@ -10443,7 +10443,7 @@ var ArtifactImporter = class {
   }
 };
 
-// node_modules/recanta-dev/dist/src/recanta.js
+// vendor/recanta/dist/src/recanta.js
 var SqliteRecanta = class extends SqliteEventStore {
   #runs;
   #processor;
@@ -11314,7 +11314,7 @@ var NovelMemoryRuntime = class _NovelMemoryRuntime {
 // src/memory/recantaEngine.ts
 init_define_WB_RECANTA();
 
-// node_modules/recanta-dev/dist/src/drivers/sqljs.js
+// vendor/recanta/dist/src/drivers/sqljs.js
 init_define_WB_RECANTA();
 var bindable = (parameters) => parameters.map((value) => typeof value === "bigint" ? Number(value) : value);
 function sqlJsDriver(database) {
@@ -11567,7 +11567,7 @@ function sqlJsWasm() {
 
 // src/memory/recantaManifest.ts
 init_define_WB_RECANTA();
-var FALLBACK = { package: "recanta-dev", commit: "", version: "", engine: "recanta", schemaVersion: 0, artifactFormat: 0, source: "unbundled (tests)" };
+var FALLBACK = { package: "recanta-dev", commit: "", version: "", engine: "recanta", schemaVersion: 0, artifactFormat: 0, vendor: "", source: "unbundled (tests)" };
 var RECANTA_MANIFEST = typeof define_WB_RECANTA_default === "object" && define_WB_RECANTA_default !== null ? define_WB_RECANTA_default : FALLBACK;
 
 // src/navigation/citationRange.ts

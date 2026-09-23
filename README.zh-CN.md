@@ -139,7 +139,7 @@ Writing Buddy 已发布到 [Obsidian Community 目录](https://community.obsidia
 
 ## 源码与开发
 
-Writing Buddy 以 MIT 许可开源。这个公开仓库会保留每个正式发布版本对应的产品源码、构建所需文件、用户文档和实际发布产物。
+Writing Buddy 以 MIT 许可开源，但 `vendor/recanta/` 下打包的记忆引擎除外（见[许可](#许可)）。这个公开仓库会保留每个正式发布版本对应的产品源码、构建所需文件、用户文档和实际发布产物。
 
 从源码构建需要 Node.js 20.19 或更高版本：
 
@@ -153,4 +153,6 @@ npm run smoke
 
 ## 许可
 
-MIT。见 [LICENSE](LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+MIT，有一处例外。见 [LICENSE](LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+`vendor/recanta/` 下的文件是插件所打包的记忆引擎构建产物。它们是作者本人的作品，保留所有权利，**不适用** MIT：可以阅读、用于构建，以及作为未经修改的 Writing Buddy 的一部分原样分发，除此之外的用途均未授权。条款见 [vendor/recanta/LICENSE](vendor/recanta/LICENSE)。

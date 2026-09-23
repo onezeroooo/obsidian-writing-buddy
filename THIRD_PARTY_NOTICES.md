@@ -6,7 +6,7 @@ The released `main.js` is built from the TypeScript sources under `src/` plus tw
 
 | Dependency | Role | License |
 | --- | --- | --- |
-| `recanta-dev` | Memory kernel bundled into `main.js` (evidence, reconciliation, retrieval, portable artifacts) | see below |
+| Recanta (`vendor/recanta`) | Memory kernel bundled into `main.js` (evidence, reconciliation, retrieval, portable artifacts); the author’s own code, carried in this repository | all rights reserved, `vendor/recanta/LICENSE` |
 | `sql.js` | SQLite compiled to WebAssembly, bundled into `main.js` as bytes | MIT (SQLite is public domain) |
 | `esbuild` | Bundles `src/` into `main.js` | MIT |
 | `typescript` | Type checking | Apache-2.0 |
@@ -19,8 +19,8 @@ The released `main.js` is built from the TypeScript sources under `src/` plus tw
 
 ## Copied source code
 
-**None.** No source file in Writing Buddy was copied from another project; Recanta and sql.js are consumed as packages and bundled by esbuild.
+The built files of the Recanta memory kernel are carried in this repository under `vendor/recanta/`, copied verbatim from one exact commit of the author’s own engine repository; `recanta-manifest.json` records that commit and a hash of those files. They are the author’s own work and are **not** covered by this repository’s MIT licence: `vendor/recanta/LICENSE` states their terms, which allow reading them, building this repository, and redistributing them verbatim as part of an unmodified Writing Buddy, and reserve every other use. They are here so that the repository installs, type-checks and builds for anyone who clones it. No source file in Writing Buddy was copied from a project the author does not own; sql.js is consumed as a package and bundled by esbuild.
 
 ## Attribution obligations
 
-The dependency licenses above remain the licenses of their respective projects. sql.js is MIT-licensed (its SQLite is public domain). Recanta is the author's own private memory kernel, embedded at build time from one exact commit (`recanta-manifest.json` records which); it is not redistributed as source, not published to any registry, and never installed, downloaded or updated by the plugin at run time.
+The dependency licenses above remain the licenses of their respective projects. sql.js is MIT-licensed (its SQLite is public domain). Recanta is the author’s own memory kernel. Its built files are redistributed here under `vendor/recanta/` and bundled into `main.js`; `recanta-manifest.json` records the commit they came from and a hash over them. It is not published to any registry, and the plugin never installs, downloads or updates it at run time.

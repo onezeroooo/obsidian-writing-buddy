@@ -5,5 +5,6 @@
 	"engine": "recanta",
 	"schemaVersion": 6,
 	"artifactFormat": 1,
-	"source": "private build-time dependency; embedded into main.js, never installed or fetched at run time"
+	"vendor": "sha256:7d52c8a58dca9de347f3a365df1278af1c7bdad6ea4f4f2195fd7a80326ad32e",
+	"source": "the author's own memory kernel, vendored into this repository under vendor/recanta and bundled into main.js; never installed, downloaded or updated at run time"
 }

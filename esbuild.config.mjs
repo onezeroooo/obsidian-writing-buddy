@@ -22,6 +22,13 @@ const options = {
 	banner: { js: banner },
 	// The embedded engine's identity is fixed at build time from the exact pinned commit.
 	define: { __WB_BUILD_ID__: JSON.stringify(buildId), __WB_RECANTA__: JSON.stringify(await resolveRecantaManifest()) },
+	// The engine is bundled from the copy this repository carries, so the public
+	// snapshot builds the same bytes as the development tree without reaching for
+	// a dependency only its author can install.
+	alias: {
+		"recanta-dev": "./vendor/recanta/dist/src/index.js",
+		"recanta-dev/sqljs": "./vendor/recanta/dist/src/drivers/sqljs.js",
+	},
 	entryPoints: ["src/main.ts"],
 	bundle: true,
 	// Everything Obsidian supplies at runtime, plus Electron/Node built-ins,
