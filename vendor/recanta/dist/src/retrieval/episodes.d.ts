@@ -45,7 +45,6 @@ export interface EpisodeResult {
 }
 /** A bounded stream neighborhood, not an inferred episode or universal experience graph. */
 export declare class EpisodeRetrieval {
-    #private;
     constructor(db: SqlDatabase, store: SqliteEventStore);
     search(access: Access, request: EpisodeRequest): EpisodeResult;
 }

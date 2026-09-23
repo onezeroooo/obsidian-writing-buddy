@@ -5,7 +5,6 @@ import type { SqliteEventStore } from "../store/sqlite.ts";
 type Transaction = <T>(mode: "DEFERRED", action: () => T) => T;
 /** Bounded exact-scan strategies for evaluation; no persistent vector index. */
 export declare class AdvancedRetrieval {
-    #private;
     constructor(db: SqlDatabase, store: SqliteEventStore, transaction: Transaction, options?: AdvancedRetrievalOptions);
     search(access: Access, request: AdvancedSearchRequest): Promise<AdvancedSearchResult>;
 }

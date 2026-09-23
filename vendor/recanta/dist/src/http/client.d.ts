@@ -10,7 +10,6 @@ export declare class MemoryHttpError extends Error {
 }
 /** Remote implementation of the same MemoryClient contract. */
 export declare class HttpMemoryClient implements ManagedMemoryClient {
-    #private;
     constructor(options: HttpMemoryClientOptions);
     add(request: MemoryAddRequest): Promise<MemoryAddResult>;
     search(request: MemorySearchRequest): Promise<MemorySearchResult>;

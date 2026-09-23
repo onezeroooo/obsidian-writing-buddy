@@ -4,7 +4,6 @@ import type { ExtractionOutput, ProcessingRun, ProviderUsage, SourceMetadata } f
 type Transaction = <T>(mode: "IMMEDIATE" | "DEFERRED", action: () => T) => T;
 /** Durable processing request, lease, usage, output and terminal-state owner. */
 export declare class SqliteProcessingRuns {
-    #private;
     constructor(db: SqlDatabase, store: EventStore, transaction: Transaction);
     save(run: ProcessingRun): void;
     /** A state change is a namespace commit; the run row records that version so it exports incrementally. */

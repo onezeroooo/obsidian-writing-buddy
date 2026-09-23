@@ -4,7 +4,6 @@ import type { MemoryListRequest, MemoryListResult, MemorySourceItem, MemoryHealt
 import type { MemoryAddRequest, MemoryAddResult, MemorySearchRequest, MemorySearchResult, TrustedIntegrationPrincipal, TrustedSourceProvenance } from "./contracts.ts";
 /** Promise-based facade keeps embedded and remote transports behaviorally aligned. */
 export declare class EmbeddedMemoryClient implements ManagedMemoryClient {
-    #private;
     constructor(engine: SqliteRecanta, access: Access, principal: TrustedIntegrationPrincipal);
     /** Normal path: untrusted request data; source provenance and authority are the bound principal default. */
     add(request: MemoryAddRequest): Promise<MemoryAddResult>;

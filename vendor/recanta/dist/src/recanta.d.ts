@@ -14,7 +14,6 @@ import type { DocumentReceipt, DocumentRevision, DocumentState, LifecycleReceipt
 import type { ArtifactStore, ExportRequest, ExportResult, ImportReport, PortableArtifact, SyncReport } from "./portable/contracts.ts";
 /** Embedded facade; inherited low-level capabilities keep their original contracts. */
 export declare class SqliteRecanta extends SqliteEventStore implements MemoryProcessor {
-    #private;
     constructor(database: string | SqlDatabase, options?: ProcessingOptions & {
         rebuildSearchIndex?: boolean;
         retrieval?: AdvancedRetrievalOptions;

@@ -1,7 +1,6 @@
 import type { EmbeddingProvider } from "./advanced-contracts.ts";
 /** Explicit OpenAI-compatible embeddings endpoint. No environment discovery. */
 export declare class HttpEmbeddingProvider implements EmbeddingProvider {
-    #private;
     readonly fingerprint: string;
     constructor(options: {
         endpoint: string;

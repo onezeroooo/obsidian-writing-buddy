@@ -15,7 +15,6 @@ type HeadReader = (scopeId: string, sourceId: string) => {
  * their extraction output, and runs without one are merely listed as needing processing.
  */
 export declare class ArtifactImporter {
-    #private;
     constructor(db: SqlDatabase, transaction: Transaction, index: SqliteLexicalIndex, head: HeadReader, access: Access);
     import(artifacts: readonly PortableArtifact[]): ImportReport;
     /** Marks artifacts written by this device as applied so a later import does not reread its own files. */

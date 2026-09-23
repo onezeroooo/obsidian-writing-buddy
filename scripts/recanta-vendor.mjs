@@ -16,6 +16,12 @@
  *
  *   node scripts/recanta-vendor.mjs            verify the copy against the pin
  *   node scripts/recanta-vendor.mjs --write    refresh it from the pin
+ *
+ * One normalisation is applied, and the comparison applies it too: the
+ * `#private;` lines TypeScript emits into a declaration file for a class with
+ * ES private fields are dropped. The directory's lint reads each of them as an
+ * unused private member; they carry no type a caller can use, `tsc` passes
+ * without them, and declarations are not bundled, so `main.js` is unaffected.
  */
 
 import { createRequire } from "node:module";
@@ -40,7 +46,9 @@ Generated. Do not edit by hand.
 
 These are the built files of the memory engine Writing Buddy bundles into
 \`main.js\`: the same bytes the plugin ships, in the form a reader can follow.
-They are copied verbatim from one exact commit of the engine's own repository;
+They are copied from one exact commit of the engine's own repository, with
+one change: declaration files drop the \`#private;\` lines TypeScript emits
+for classes with private fields, which carry no usable type;
 \`../../recanta-manifest.json\` records which commit, which engine and schema
 version, and the hash of this directory.
 
@@ -51,6 +59,13 @@ They are here so that this repository installs, type-checks and builds for
 anyone who clones it. Refresh them with \`node scripts/recanta-vendor.mjs
 --write\` from the development repository, never by editing a file below.
 `;
+
+/** A file's bytes as this repository carries them: declaration files without their `#private;` markers. */
+export function normalizeVendored(file, bytes) {
+	if (!file.endsWith(".d.ts")) return bytes;
+	const text = bytes.toString("utf8").replace(/^[ \t]*#private;[ \t]*\r?\n/gmu, "");
+	return Buffer.from(text, "utf8");
+}
 
 /** Every vendored file, relative to the vendor directory, in a stable order. */
 export function vendoredFiles(root = path.join(repoRoot, VENDOR_DIR)) {
@@ -103,6 +118,10 @@ function write() {
 		if (!existsSync(from)) continue;
 		cpSync(from, path.join(target, entry), { recursive: true });
 	}
+	for (const file of vendoredFiles(target)) {
+		const full = path.join(target, file);
+		writeFileSync(full, normalizeVendored(file, readFileSync(full)));
+	}
 	writeFileSync(path.join(target, "VENDORED.md"), NOTE);
 	// These files are not MIT like the rest of the repository; the licence travels with them.
 	cpSync(path.join(repoRoot, "scripts", "recanta-license.txt"), path.join(target, "LICENSE"));
@@ -119,7 +138,7 @@ export function vendorMatchesInstalled() {
 	for (const file of vendoredFiles(target)) {
 		const from = path.join(installed, file);
 		if (!existsSync(from)) { differences.push(`${file}: not in the installed package`); continue; }
-		if (!readFileSync(from).equals(readFileSync(path.join(target, file)))) differences.push(`${file}: differs`);
+		if (!normalizeVendored(file, readFileSync(from)).equals(readFileSync(path.join(target, file)))) differences.push(`${file}: differs`);
 	}
 	for (const entry of VENDORED) {
 		const from = path.join(installed, entry);

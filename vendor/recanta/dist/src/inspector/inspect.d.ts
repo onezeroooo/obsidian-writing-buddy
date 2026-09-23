@@ -7,7 +7,6 @@ import type { ContextPlan } from "../context/plan.ts";
 import type { ContextResult } from "../context/contracts.ts";
 /** Caller provides the read transaction; inspection repeats all normal access checks. */
 export declare class MemoryInspector {
-    #private;
     constructor(db: SqlDatabase, store: SqliteRecanta);
     context(access: Access, request: RecallRequest, context: ContextResult, plan: ContextPlan): Inspection;
     evidence(access: Access, evidenceId: string): EvidenceInspection;

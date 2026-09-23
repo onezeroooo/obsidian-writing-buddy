@@ -11,7 +11,6 @@ import type { ContextCompiler, ContextRequest, ContextResult } from "../context/
  * `SqlDatabase` driver (browser/mobile hosts). The store owns and closes either one.
  */
 export declare class SqliteEventStore implements EventStore, EvidenceRetriever, ClaimStore, ContextCompiler {
-    #private;
     protected get database(): SqlDatabase;
     protected get lexicalIndex(): SqliteLexicalIndex;
     protected get claimStore(): SqliteClaims;

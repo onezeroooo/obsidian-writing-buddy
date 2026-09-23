@@ -57,7 +57,7 @@ var __toBinary = /* @__PURE__ */ (() => {
 var define_WB_RECANTA_default;
 var init_define_WB_RECANTA = __esm({
   "<define:__WB_RECANTA__>"() {
-    define_WB_RECANTA_default = { package: "recanta-dev", commit: "89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b", version: "0.1.0", engine: "recanta", schemaVersion: 6, artifactFormat: 1, vendor: "sha256:7d52c8a58dca9de347f3a365df1278af1c7bdad6ea4f4f2195fd7a80326ad32e", source: "the author's own memory kernel, vendored into this repository under vendor/recanta and bundled into main.js; never installed, downloaded or updated at run time" };
+    define_WB_RECANTA_default = { package: "recanta-dev", commit: "89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b", version: "0.1.0", engine: "recanta", schemaVersion: 6, artifactFormat: 1, vendor: "sha256:e000b86bacdeafae79c9c085c0c77287d008a87947affa5d9bdf687198daeeb7", source: "the author's own memory kernel, vendored into this repository under vendor/recanta and bundled into main.js; never installed, downloaded or updated at run time" };
   }
 });
 
@@ -30192,8 +30192,8 @@ var DirectAPIBackend = class {
           result = next.value;
         } catch (error) {
           if (!(error instanceof StreamUnavailableError) || streamed) throw error;
-          this.streamingBlocked = true;
           result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
+          this.streamingBlocked = true;
         }
       } else {
         result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);

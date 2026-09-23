@@ -9,7 +9,6 @@ type HeadReader = (access: Access, scopeId: string, sourceId: string) => {
     deleted: boolean;
 } | undefined;
 export declare class SqliteEvidenceRetrieval {
-    #private;
     constructor(db: SqlDatabase, index: SqliteLexicalIndex, snapshot: SnapshotReader, evidence: EvidenceReader, head: HeadReader);
     search(access: Access, request: SearchRequest): SearchResult;
     resolve(access: Access, citation: EvidenceCitation, options?: {

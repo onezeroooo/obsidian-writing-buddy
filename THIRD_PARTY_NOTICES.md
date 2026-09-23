@@ -19,7 +19,7 @@ The released `main.js` is built from the TypeScript sources under `src/` plus tw
 
 ## Copied source code
 
-The built files of the Recanta memory kernel are carried in this repository under `vendor/recanta/`, copied verbatim from one exact commit of the author’s own engine repository; `recanta-manifest.json` records that commit and a hash of those files. They are the author’s own work and are **not** covered by this repository’s MIT licence: `vendor/recanta/LICENSE` states their terms, which allow reading them, building this repository, and redistributing them verbatim as part of an unmodified Writing Buddy, and reserve every other use. They are here so that the repository installs, type-checks and builds for anyone who clones it. No source file in Writing Buddy was copied from a project the author does not own; sql.js is consumed as a package and bundled by esbuild.
+The built files of the Recanta memory kernel are carried in this repository under `vendor/recanta/`, copied from one exact commit of the author’s own engine repository (declaration files without the `#private;` lines TypeScript emits); `recanta-manifest.json` records that commit and a hash of those files. They are the author’s own work and are **not** covered by this repository’s MIT licence: `vendor/recanta/LICENSE` states their terms, which allow reading them, building this repository, and redistributing them verbatim as part of an unmodified Writing Buddy, and reserve every other use. They are here so that the repository installs, type-checks and builds for anyone who clones it. No source file in Writing Buddy was copied from a project the author does not own; sql.js is consumed as a package and bundled by esbuild.
 
 ## Attribution obligations
 

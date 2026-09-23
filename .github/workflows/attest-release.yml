@@ -1,0 +1,36 @@
+# Signs a provenance attestation for the three files every GitHub Release ships, so anyone can
+# check that the main.js, manifest.json and styles.css they downloaded are the ones published here:
+#
+#   gh attestation verify main.js --repo onezeroooo/obsidian-writing-buddy
+#
+# Releases are published from this repository only; nothing here builds or changes the files.
+name: attest-release
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose assets to attest
+        required: true
+permissions:
+  contents: read
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern main.js --pattern manifest.json --pattern styles.css
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css

@@ -3,7 +3,6 @@ import type { SearchHit } from "./contracts.ts";
 export declare function fts5Available(db: SqlDatabase): boolean;
 /** Internal projection. The caller owns transactions and trusted scope checks. */
 export declare class SqliteLexicalIndex {
-    #private;
     constructor(db: SqlDatabase);
     /** The acceleration structure this runtime can maintain; part of the local index identity. */
     get acceleration(): "fts5" | "scan";

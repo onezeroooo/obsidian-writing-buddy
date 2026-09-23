@@ -4,7 +4,6 @@ import type { Candidate, ProcessingPlan, ProcessingRun, RetainReceipt } from "./
 import { SqliteProcessingRuns } from "./sqlite-runs.ts";
 type Transaction = <T>(mode: "IMMEDIATE" | "DEFERRED", action: () => T) => T;
 export declare class SqliteProcessing {
-    #private;
     constructor(db: SqlDatabase, store: EventStore, transaction: Transaction);
     get(...args: Parameters<SqliteProcessingRuns["get"]>): ProcessingRun;
     request(...args: Parameters<SqliteProcessingRuns["request"]>): ProcessingRun;

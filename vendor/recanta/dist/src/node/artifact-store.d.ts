@@ -5,7 +5,6 @@ import type { ArtifactStore } from "../portable/contracts.ts";
  * Names are validated to stay inside the root; the root path itself never enters an artifact.
  */
 export declare class FileArtifactStore implements ArtifactStore {
-    #private;
     constructor(root: string);
     list(prefix: string): Promise<string[]>;
     read(name: string): Promise<string | null>;

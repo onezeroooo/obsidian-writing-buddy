@@ -7,7 +7,6 @@ import type { ContextPlan, ContextPlanResult } from "./plan.ts";
 import type { MemoryDiscoveryRequest, MemoryDiscoveryResult, RecallRequest } from "./recall-contracts.ts";
 /** One read transaction owns authorized discovery, decisions and mechanical rendering. */
 export declare class ContextAssembler {
-    #private;
     constructor(db: SqlDatabase, store: SqliteEventStore, policy?: ContextBudgetPolicy, maxCorpusPassages?: number);
     discover(access: Access, request: MemoryDiscoveryRequest): MemoryDiscoveryResult;
     recall(access: Access, request: RecallRequest): ContextResult;

@@ -983,21 +983,27 @@
 }
 
 .wb-activity-facts {
-	display: grid;
-	grid-template-columns: max-content minmax(0, 1fr);
-	column-gap: 12px;
-	row-gap: 2px;
+	/* A table, not a grid of display: contents rows: the directory's scan
+	   flags display: contents and column-gap, and a table aligns the key
+	   column across rows just the same. */
+	display: table;
+	width: 100%;
+	border-collapse: collapse;
 }
 
-.wb-activity-fact { display: contents; }
+.wb-activity-fact { display: table-row; }
 
 .wb-activity-fact-key {
+	display: table-cell;
+	width: 1%;
+	padding: 0 12px 2px 0;
 	line-height: 1.6;
 	white-space: nowrap;
 }
 
 .wb-activity-fact-value {
-	min-width: 0;
+	display: table-cell;
+	padding-bottom: 2px;
 	color: var(--text-muted);
 	line-height: 1.6;
 	overflow-wrap: anywhere;
@@ -1060,9 +1066,11 @@
 	color: var(--link-color, var(--text-accent));
 	font: inherit;
 	cursor: pointer;
-	text-decoration: var(--link-decoration, underline);
-	text-decoration-color: color-mix(in srgb, var(--link-color, var(--text-accent)) 45%, transparent);
-	text-underline-offset: 3px;
+	/* A border, not a coloured underline: text-decoration-color is flagged
+	   by the directory's scan as partially supported. */
+	text-decoration: none;
+	border-bottom: 1px solid color-mix(in srgb, var(--link-color, var(--text-accent)) 45%, transparent);
+	padding-bottom: 1px;
 }
 
 /* Quieter than the references it divides. */
@@ -1072,7 +1080,7 @@
 
 .wb-source-inline:hover {
 	color: var(--link-color-hover, var(--text-accent-hover));
-	text-decoration-color: currentColor;
+	border-bottom-color: currentColor;
 }
 
 /* --------------------------------------------------------- branch markers */
@@ -1295,7 +1303,6 @@
 	background: rgba(220, 76, 70, 0.18);
 	color: var(--text-normal);
 	text-decoration: line-through;
-	text-decoration-color: rgba(220, 76, 70, 0.75);
 	border-radius: 2px;
 }
 

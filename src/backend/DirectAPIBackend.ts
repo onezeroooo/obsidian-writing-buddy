@@ -167,8 +167,12 @@ export class DirectAPIBackend implements AIBackend {
 					result = next.value;
 				} catch (error) {
 					if (!(error instanceof StreamUnavailableError) || streamed) throw error;
-					this.streamingBlocked = true;
 					result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
+					// Only a whole reply that arrived proves the stream, not the endpoint,
+					// was refused. A proxy's error page without CORS headers also fails the
+					// fetch; blocking on it left a phone on the whole-reply path, whose
+					// platform timeout then cut every long call (2026-09-23).
+					this.streamingBlocked = true;
 				}
 			} else {
 				result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
