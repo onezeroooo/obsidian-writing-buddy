@@ -166,7 +166,17 @@ export function contextBudgetFor(depth: ContextDepth | ResolvedContextDepth | un
 }
 
 /** Formal user-facing Context choices, in product order. */
-export const CONTEXT_DEPTHS: Array<{ id: ContextDepth }> = [{ id: "auto" }, { id: "full" }, { id: "low" }];
+/**
+ * The Context choices the Composer and Settings offer for ordinary turns.
+ *
+ * `full` is no longer among them. Whole-manuscript analysis is a separate,
+ * explicit operation — the command "Analyze whole manuscript", the Continue
+ * offered after an Auto turn that needs it, and manual rebuilds of novel
+ * knowledge — not a setting a conversation carries into every generation.
+ * The `ContextDepth` type keeps `full` so stored turns and those explicit
+ * operations still plan exactly as they did.
+ */
+export const CONTEXT_DEPTHS: Array<{ id: ContextDepth }> = [{ id: "auto" }, { id: "low" }];
 
 /** The depth's name in the interface language. */
 export function contextDepthLabel(id: ContextDepth): string {

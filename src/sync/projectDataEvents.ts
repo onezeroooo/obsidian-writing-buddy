@@ -1,5 +1,5 @@
 import {
-	CONVERSATIONS_DIR, MEMORY_DIR, SKILLS_DIR, SKILL_MIGRATION_FILE, SKILL_RESET_STATE_FILE,
+	projectPaths,
 } from "../storage/paths";
 import { isSafeSessionId } from "../util/id";
 
@@ -25,7 +25,7 @@ export type ProjectDataPath =
  */
 export function projectDataPath(path: string): ProjectDataPath | null {
 	const normalized = path.replace(/\\/g, "/");
-	const conversationPrefix = `${CONVERSATIONS_DIR}/`;
+	const conversationPrefix = `${projectPaths.conversationsDir}/`;
 	if (normalized.startsWith(conversationPrefix) && normalized.endsWith(".json")) {
 		const name = normalized.slice(conversationPrefix.length, -".json".length);
 		if (!name.includes("/")) {
@@ -37,8 +37,8 @@ export function projectDataPath(path: string): ProjectDataPath | null {
 		if (!isSafeSessionId(sessionId) || !/^\d{4}$/u.test(shard)) return null;
 		return { kind: "conversation", sessionId };
 	}
-	if (normalized === SKILL_MIGRATION_FILE || normalized === SKILL_RESET_STATE_FILE) return { kind: "skill" };
-	if (normalized.startsWith(`${SKILLS_DIR}/`) && normalized.endsWith(".md")) return { kind: "skill" };
-	if (normalized.startsWith(`${MEMORY_DIR}/`) && normalized.endsWith(".md")) return { kind: "memory" };
+	if (normalized === projectPaths.skillMigrationFile || normalized === projectPaths.skillResetStateFile) return { kind: "skill" };
+	if (normalized.startsWith(`${projectPaths.skillsDir}/`) && normalized.endsWith(".md")) return { kind: "skill" };
+	if (normalized.startsWith(`${projectPaths.memoryDir}/`) && normalized.endsWith(".md")) return { kind: "memory" };
 	return null;
 }

@@ -27,6 +27,7 @@ Thumbs.db
 test-vault/
 vaults/
 *.vault/
+internal/reports/
 
 # coverage / temp
 coverage/

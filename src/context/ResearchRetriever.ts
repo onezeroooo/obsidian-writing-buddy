@@ -23,7 +23,7 @@ import type {
 import { DEFAULT_RESEARCH_AROUND_CHARS, MAX_RESEARCH_AROUND_CHARS } from "./ResearchProtocol";
 import { countChars } from "../util/text";
 import { contentRevision } from "./revision";
-import { MEMORY_DIR } from "../storage/paths";
+import { projectPaths } from "../storage/paths";
 
 export const DEFAULT_RESEARCH_FILE_LIMIT = 12;
 export const DEFAULT_RESEARCH_EVIDENCE_LIMIT = 16;
@@ -840,7 +840,7 @@ function rankSearchPaths(
 }
 
 function evidenceForPassage(path: string, text: string, truncated: boolean, sourceChars?: number): EvidenceItem[] {
-	const role = path.startsWith(`${MEMORY_DIR}/`) ? "memory" as const : "retrieved" as const;
+	const role = path.startsWith(`${projectPaths.memoryDir}/`) ? "memory" as const : "retrieved" as const;
 	const kind: EvidenceKind = kindOf({ path, role, text, truncated });
 	const name = path.split("/").pop()?.replace(/\.md$/iu, "") ?? path;
 	return splitSections(text).map((section) => ({

@@ -15,7 +15,7 @@ export type {
 	InstructionLayerId,
 	InstructionLayerOwner,
 } from "./composeEffectiveInstructions";
-export { PROJECT_INSTRUCTIONS_PATH, ProjectInstructions } from "./ProjectInstructions";
+export { projectInstructionsPath, ProjectInstructions } from "./ProjectInstructions";
 export type {
 	ProjectInstructionsState,
 	ProjectInstructionsStatus,

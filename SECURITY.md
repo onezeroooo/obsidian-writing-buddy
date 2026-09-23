@@ -8,7 +8,7 @@ Writing Buddy runs inside Obsidian and talks only to the AI connections you conf
 - **Nothing is written to a note without being shown first.** Ask never edits. Rewrite produces a candidate you review as a diff; only Apply writes, and only to the exact range it was made for. If that text moved, the edit is refused.
 - **Connections never see your vault.** A turn sends the selected text, your instructions and the context Writing Buddy itself assembled. Connections receive text, never file paths or file access; requests carrying an unsafe vault path are not sent.
 - **Manuscript text is data, not instructions.** Project notes, imported material and model output cannot widen what is read or what may be edited.
-- **No shell, no process execution, no eval.** The bundle has no runtime dependencies.
+- **No shell, no process execution, no eval.** The bundle carries two dependencies, both bundled at build time and neither reaching the network: the Recanta memory kernel and SQLite compiled to WebAssembly.
 
 ## Reporting a vulnerability
 

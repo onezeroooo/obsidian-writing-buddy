@@ -65,6 +65,11 @@ export class ObsidianVaultFs implements VaultFs {
 		await this.adapter.remove(normalizePath(path));
 	}
 
+	async rename(from: string, to: string): Promise<void> {
+		this.calls += 1;
+		await this.adapter.rename(normalizePath(from), normalizePath(to));
+	}
+
 	async stat(path: string): Promise<{ mtime: number; size: number } | null> {
 		this.calls += 1;
 		const stat = await this.adapter.stat(normalizePath(path));

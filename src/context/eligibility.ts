@@ -7,7 +7,7 @@
  * draft that the ordinary context path would have rejected.
  */
 
-import { CACHE_DIR, MEMORY_DIR, PROJECT_ROOT } from "../storage/paths";
+import { CACHE_DIR, LEGACY_PROJECT_ROOTS, projectPaths } from "../storage/paths";
 
 export type ContextCorpusScope = "bounded" | "full-current-manuscript";
 
@@ -21,8 +21,30 @@ export interface ContextEligibilityOptions {
 	scope?: ContextCorpusScope;
 }
 
-const MEMORY_PREFIX = `${MEMORY_DIR}/`;
-const INTERNAL_ROOTS = [PROJECT_ROOT, CACHE_DIR, "_WritingBuddy", ".writing-buddy"] as const;
+/**
+ * Plugin-owned roots that never change: the hidden cache and the pre-1.0
+ * folders the migration reads from. The current project root is read live
+ * from `projectPaths`, because the writer can move it while the vault is open.
+ */
+const FIXED_INTERNAL_ROOTS = [CACHE_DIR, ...LEGACY_PROJECT_ROOTS] as const;
+
+/**
+ * Other folders in the vault that hold a `project.json` of ours — a backup
+ * copied in from another vault, or the folder that was active before a
+ * writer switched to a different one. Never the current root. They are
+ * excluded from context for the same reason the root is: a folder of the
+ * writer's own conversations is not manuscript.
+ */
+let inactiveProjectRoots: readonly string[] = [];
+
+export function setInactiveProjectRoots(roots: readonly string[]): void {
+	inactiveProjectRoots = roots.map(normaliseVaultPath).filter((root) => root.length > 0);
+}
+
+/** Machine-managed novel knowledge: never manuscript, never canon, never retrieved as context. */
+function managedKnowledgePrefix(): string {
+	return `${projectPaths.memoryDir}/novel/`;
+}
 
 /**
  * Obsidian's own configuration folder, which the user can rename. The plugin
@@ -38,7 +60,8 @@ export function setVaultConfigDir(dir: string | null): void {
 /** True for plugin-owned state and Obsidian's own configuration. Bounded retrieval admits only curated memory. */
 export function isInternalContextPath(path: string): boolean {
 	const normalised = normaliseVaultPath(path);
-	const roots: readonly string[] = vaultConfigDir ? [...INTERNAL_ROOTS, vaultConfigDir] : INTERNAL_ROOTS;
+	const roots: string[] = [projectPaths.root, ...FIXED_INTERNAL_ROOTS, ...inactiveProjectRoots];
+	if (vaultConfigDir) roots.push(vaultConfigDir);
 	return roots.some((root) => normalised === root || normalised.startsWith(`${root}/`));
 }
 
@@ -85,7 +108,7 @@ export function isEligibleContextPath(path: string, options: ContextEligibilityO
 	if (scope === "full-current-manuscript") {
 		if (isInternalContextPath(normalised)) return false;
 		if (options.root !== undefined && !isWithinContextRoot(normalised, normaliseVaultPath(options.root))) return false;
-	} else if (isInternalContextPath(normalised) && !normalised.startsWith(MEMORY_PREFIX)) {
+	} else if (isInternalContextPath(normalised) && (!normalised.startsWith(`${projectPaths.memoryDir}/`) || normalised.startsWith(managedKnowledgePrefix()))) {
 		return false;
 	}
 

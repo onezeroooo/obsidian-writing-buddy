@@ -1,5 +1,5 @@
 import type { ProjectStore, StoredSkillFile } from "../storage/ProjectStore";
-import { CUSTOM_SKILLS_DIR, SKILLS_DIR, SKILL_OVERRIDES_DIR } from "../storage/paths";
+import { projectPaths } from "../storage/paths";
 import {
 	findHistoricalBuiltin,
 	findCanonicalHistoricalBuiltin,
@@ -69,7 +69,7 @@ interface SkillResetRecord {
 
 interface ClassifiedSource {
 	classification: LegacySkillClassification;
-	destinationDirectory?: typeof CUSTOM_SKILLS_DIR | typeof SKILL_OVERRIDES_DIR;
+	destinationDirectory?: string;
 	contents?: string;
 	detail?: string;
 }
@@ -307,7 +307,7 @@ function classifySource(source: string, path: string, hash: string): ClassifiedS
 		};
 		return {
 			classification: "legacy-customization",
-			destinationDirectory: SKILL_OVERRIDES_DIR,
+			destinationDirectory: projectPaths.skillOverridesDir,
 			contents: replacementSource(source, parsed.skill, metadata),
 			detail: "Base could not be identified; preserved as an explicit replacement for review.",
 		};
@@ -315,7 +315,7 @@ function classifySource(source: string, path: string, hash: string): ClassifiedS
 
 	return {
 		classification: "legacy-custom",
-		destinationDirectory: CUSTOM_SKILLS_DIR,
+		destinationDirectory: projectPaths.customSkillsDir,
 		contents: source,
 	};
 }
@@ -357,7 +357,7 @@ function resetRecordFor(
 	if (classified.classification !== "legacy-customization") return undefined;
 	return [...resetReceipts.values()].find((record) =>
 		record.sourcePath === path && record.sourceHash === hash &&
-		isDirectChild(record.destination, SKILL_OVERRIDES_DIR));
+		isDirectChild(record.destination, projectPaths.skillOverridesDir));
 }
 
 function createResetReceipt(): string {
@@ -392,12 +392,12 @@ function isResetRecord(value: unknown): value is SkillResetRecord {
 	const record = value as Record<string, unknown>;
 	return isSha256(record.receipt) && isDirectLegacyMarkdownPath(String(record.sourcePath)) &&
 		isSha256(record.sourceHash) && typeof record.destination === "string" &&
-		isDirectChild(record.destination, SKILL_OVERRIDES_DIR) && isSha256(record.destinationHash);
+		isDirectChild(record.destination, projectPaths.skillOverridesDir) && isSha256(record.destinationHash);
 }
 
 async function resolveDestination(
 	store: ProjectStore,
-	directory: typeof CUSTOM_SKILLS_DIR | typeof SKILL_OVERRIDES_DIR,
+	directory: string,
 	sourcePath: string,
 	sourceHash: string,
 	contents: string,
@@ -427,7 +427,7 @@ async function resolveDestination(
 	}
 
 	const stored = await store.listStoredSkillFiles({ includeLegacy: false });
-	const location = directory === CUSTOM_SKILLS_DIR ? "custom" : "override";
+	const location = directory === projectPaths.customSkillsDir ? "custom" : "override";
 	const files = stored
 		.filter((file) => file.location === location && isDirectChild(file.path, directory))
 		.sort((left, right) => left.path.localeCompare(right.path));
@@ -522,7 +522,7 @@ function isManifestEntry(value: unknown): value is SkillMigrationEntry {
 	if (entry.classification === "legacy-customization-reset") {
 		return entry.destination === null && entry.destinationHash === undefined &&
 			entry.pendingDestinationHash === undefined && entry.previousSourceHash === undefined && entry.state === undefined &&
-			typeof entry.resetDestination === "string" && isDirectChild(entry.resetDestination, SKILL_OVERRIDES_DIR) &&
+			typeof entry.resetDestination === "string" && isDirectChild(entry.resetDestination, projectPaths.skillOverridesDir) &&
 			isSha256(entry.resetDestinationHash) && isSha256(entry.resetReceipt);
 	}
 	if (entry.classification === "seeded-mirror" || entry.classification === "malformed") {
@@ -532,7 +532,7 @@ function isManifestEntry(value: unknown): value is SkillMigrationEntry {
 	}
 	if (entry.resetDestination !== undefined || entry.resetDestinationHash !== undefined || entry.resetReceipt !== undefined) return false;
 	if (typeof entry.destination !== "string") return false;
-	const root = entry.classification === "legacy-custom" ? CUSTOM_SKILLS_DIR : SKILL_OVERRIDES_DIR;
+	const root = entry.classification === "legacy-custom" ? projectPaths.customSkillsDir : projectPaths.skillOverridesDir;
 	if (!isDirectChild(entry.destination, root)) return false;
 	if (entry.state === "destination-modified") {
 		return isSha256(entry.destinationHash) && isSha256(entry.pendingDestinationHash);
@@ -567,7 +567,7 @@ function isSha256(value: unknown): value is string {
 }
 
 function isDirectLegacyMarkdownPath(path: string): boolean {
-	return isDirectChild(path, SKILLS_DIR);
+	return isDirectChild(path, projectPaths.skillsDir);
 }
 
 function isDirectChild(path: string, directory: string): boolean {

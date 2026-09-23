@@ -155,7 +155,7 @@ export class DirectAPIBackend implements AIBackend {
 				// Stream when possible; a stream that cannot be opened at all falls
 				// back to the whole reply, and stays there for this connection.
 				let streamed = "";
-				const stream = this.streamCompletion(this.streamClient, model, messages, instructions, payload.effort, controller.signal);
+				const stream = this.streamCompletion(this.streamClient, model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
 				try {
 					let next = await stream.next();
 					while (!next.done) {
@@ -168,10 +168,10 @@ export class DirectAPIBackend implements AIBackend {
 				} catch (error) {
 					if (!(error instanceof StreamUnavailableError) || streamed) throw error;
 					this.streamingBlocked = true;
-					result = await this.complete(model, messages, instructions, payload.effort, controller.signal);
+					result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
 				}
 			} else {
-				result = await this.complete(model, messages, instructions, payload.effort, controller.signal);
+				result = await this.complete(model, messages, instructions, payload.effort, payload.maxOutputTokens, controller.signal);
 			}
 			if (this.cancelled.delete(payload.requestId) || controller.signal.aborted) return;
 			if (isOutputBudgetExhausted(result.finishReason)) {
@@ -212,6 +212,7 @@ export class DirectAPIBackend implements AIBackend {
 				code: message === unsafeVaultPathMessage() ? "invalid_request" : isAuthError(message) ? "unauthorized" : "direct_api_error",
 				message,
 				...(error instanceof HttpStatusError ? { status: error.status } : {}),
+				...(error instanceof HttpStatusError && error.retryAfterSec !== undefined ? { retryAfterSec: error.retryAfterSec } : {}),
 			};
 		} finally {
 			this.cancelled.delete(payload.requestId);
@@ -244,12 +245,13 @@ export class DirectAPIBackend implements AIBackend {
 		messages: AdapterMessage[],
 		instructions: string | undefined,
 		effort: string | null,
+		maxOutputTokens: number | undefined,
 		signal: AbortSignal,
 	): Promise<Completion> {
 		const provider = this.connection.config.provider;
 		const key = this.connection.config.apiKey;
 		const base = baseUrl(this.connection);
-		const request = completionRequest(provider, base, key, model, messages, instructions, effort);
+		const request = completionRequest(provider, base, key, model, messages, instructions, effort, maxOutputTokens);
 		const response = await this.httpClient({
 			url: request.url,
 			method: "POST",
@@ -273,13 +275,14 @@ export class DirectAPIBackend implements AIBackend {
 		messages: AdapterMessage[],
 		instructions: string | undefined,
 		effort: string | null,
+		maxOutputTokens: number | undefined,
 		signal: AbortSignal,
 	): AsyncGenerator<string, Completion> {
 		const provider = this.connection.config.provider;
 		const key = this.connection.config.apiKey;
-		const request = streamingRequest(provider, completionRequest(provider, baseUrl(this.connection), key, model, messages, instructions, effort));
+		const request = streamingRequest(provider, completionRequest(provider, baseUrl(this.connection), key, model, messages, instructions, effort, maxOutputTokens));
 		const response = await streamClient({ url: request.url, method: "POST", signal, headers: request.headers, body: JSON.stringify(request.body) });
-		if (!response.ok) throw await httpError({ status: response.status, text: await response.text() }, key);
+		if (!response.ok) throw await httpError({ status: response.status, text: await response.text(), headers: response.headers }, key);
 		if (!isEventStream(response.headers)) {
 			let json: unknown = null;
 			try { json = JSON.parse(await response.text()); } catch { /* an empty reply is reported below */ }
@@ -394,19 +397,24 @@ function completionRequest(
 	messages: AdapterMessage[],
 	instructions: string | undefined,
 	effort: string | null,
+	maxOutputTokens?: number,
 ): { url: string; headers: Record<string, string>; body: unknown } {
 	if (provider === "anthropic") {
 		// Effort is a thinking budget here, and `max_tokens` must leave room for
 		// the answer above it. Thinking blocks in the reply are not text and are
-		// dropped by the parsers; only the answer reaches the writer.
+		// dropped by the parsers; only the answer reaches the writer. A caller's
+		// output budget takes the answer's share, above the same thinking.
+		const thinking = anthropicThinking(effort);
+		const budgeted = maxOutputTokens ? { ...thinking, max_tokens: ("thinking" in thinking ? thinking.thinking.budget_tokens : 0) + maxOutputTokens } : thinking;
 		return {
 			url: base + "/messages",
 			headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-			body: { model, ...anthropicThinking(effort), ...(instructions ? { system: instructions } : {}), messages },
+			body: { model, ...budgeted, ...(instructions ? { system: instructions } : {}), messages },
 		};
 	}
 	if (provider === "google") {
 		const thinkingConfig = googleThinkingConfig(effort);
+		const generationConfig = { ...(thinkingConfig ? { thinkingConfig } : {}), ...(maxOutputTokens ? { maxOutputTokens } : {}) };
 		return {
 			url: base + "/models/" + encodeURIComponent(model) + ":generateContent",
 			headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -416,10 +424,13 @@ function completionRequest(
 					role: message.role === "assistant" ? "model" : "user",
 					parts: [{ text: message.content }],
 				})),
-				...(thinkingConfig ? { generationConfig: { thinkingConfig } } : {}),
+				...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
 			},
 		};
 	}
+	// OpenAI's reasoning models refuse `max_tokens` and want `max_completion_tokens`;
+	// compatible servers are the other way round often enough that each gets its own.
+	const outputLimit = maxOutputTokens ? (provider === "openai" ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }) : {};
 	return {
 		url: base + "/chat/completions",
 		headers: { "Content-Type": "application/json", ...bearer(key) },
@@ -428,6 +439,7 @@ function completionRequest(
 			messages: withSystemMessage(instructions, messages),
 			stream: false,
 			...(effort ? { reasoning_effort: effort } : {}),
+			...outputLimit,
 		},
 	};
 }
@@ -566,6 +578,18 @@ function isAbortError(error: unknown): boolean { return error instanceof Error &
 function isAuthError(error: unknown): boolean { const value = describe(error); return value.includes("HTTP 401") || value.includes("HTTP 403") || value.includes("Authentication Error"); }
 /** The endpoint answered, and said no. Carries the status so health can tell an answer from silence. */
 class HttpStatusError extends Error {
-	constructor(readonly status: number, message: string) { super(message); this.name = "HttpStatusError"; }
+	constructor(readonly status: number, message: string, readonly retryAfterSec?: number) { super(message); this.name = "HttpStatusError"; }
 }
-async function httpError(response: { status: number; text: string }, credential: string): Promise<Error> { const safe = redactCredential(response.text.slice(0, 200), credential); return new HttpStatusError(response.status, "HTTP " + response.status + (safe ? "：" + safe : "")); }
+
+/** `Retry-After` as seconds from now: the header carries either a delay in seconds or an HTTP date. */
+export function retryAfterSeconds(headers: Headers | null | undefined): number | undefined {
+	const raw = headers?.get("retry-after")?.trim();
+	if (!raw) return undefined;
+	if (/^\d+$/u.test(raw)) return Number(raw);
+	const at = Date.parse(raw);
+	return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
+async function httpError(response: { status: number; text: string; headers?: Headers | null }, credential: string): Promise<Error> {
+	const safe = redactCredential(response.text.slice(0, 200), credential);
+	return new HttpStatusError(response.status, "HTTP " + response.status + (safe ? "：" + safe : ""), retryAfterSeconds(response.headers));
+}

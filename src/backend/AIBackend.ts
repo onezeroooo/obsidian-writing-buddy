@@ -132,6 +132,12 @@ export interface TurnPayload {
 	model: string | null;
 	effort: string | null;
 	messages: RequestMessage[];
+	/**
+	 * The most output tokens this call may spend, when the caller has a
+	 * budget (novel-memory extraction does; a conversation does not). Direct
+	 * connections send it in the provider's own field.
+	 */
+	maxOutputTokens?: number;
 	/** Vault-relative path of the file being worked on. Never absolute. */
 	currentFile?: string;
 	skill?: SkillPayload;

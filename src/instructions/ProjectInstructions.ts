@@ -7,7 +7,12 @@
  * and cannot assign itself a role, priority, or policy level.
  */
 
-export const PROJECT_INSTRUCTIONS_PATH = "WritingBuddy/instructions/project.md";
+import { projectPaths } from "../storage/paths";
+
+/** The fixed file under the current project root. Read live: the root can move. */
+export function projectInstructionsPath(): string {
+	return projectPaths.projectInstructionsFile;
+}
 
 /** The narrow Vault capability needed by project instructions. */
 export interface ProjectInstructionsStorage {
@@ -50,11 +55,11 @@ export class ProjectInstructions {
 	/** Read defensively. Missing, blank, malformed, and unreadable files do not throw. */
 	async load(): Promise<ProjectInstructionsState> {
 		try {
-			if (!(await this.storage.exists(PROJECT_INSTRUCTIONS_PATH))) {
+			if (!(await this.storage.exists(projectInstructionsPath()))) {
 				return absentState();
 			}
 
-			const source: unknown = await this.storage.read(PROJECT_INSTRUCTIONS_PATH);
+			const source: unknown = await this.storage.read(projectInstructionsPath());
 			if (typeof source !== "string") {
 				return invalidState("Project instructions must be stored as text.");
 			}
@@ -80,7 +85,7 @@ export class ProjectInstructions {
 		if (!parsed.ok) return invalidState(parsed.error);
 
 		try {
-			await this.storage.write(PROJECT_INSTRUCTIONS_PATH, source);
+			await this.storage.write(projectInstructionsPath(), source);
 			return activeOrAbsentState(parsed.text);
 		} catch (error) {
 			return invalidState(`Could not save project instructions: ${errorMessage(error)}`);
@@ -90,8 +95,8 @@ export class ProjectInstructions {
 	/** Remove the customization if present. Clearing an absent file is a no-op. */
 	async clear(): Promise<ProjectInstructionsState> {
 		try {
-			if (await this.storage.exists(PROJECT_INSTRUCTIONS_PATH)) {
-				await this.storage.remove(PROJECT_INSTRUCTIONS_PATH);
+			if (await this.storage.exists(projectInstructionsPath())) {
+				await this.storage.remove(projectInstructionsPath());
 			}
 			return absentState();
 		} catch (error) {
@@ -142,16 +147,16 @@ function findCredentialLookingKeys(frontmatter: string): string[] {
 
 function activeOrAbsentState(text: string): ProjectInstructionsState {
 	return text.length > 0
-		? { text, status: "active", path: PROJECT_INSTRUCTIONS_PATH }
+		? { text, status: "active", path: projectInstructionsPath() }
 		: absentState();
 }
 
 function absentState(): ProjectInstructionsState {
-	return { text: "", status: "absent", path: PROJECT_INSTRUCTIONS_PATH };
+	return { text: "", status: "absent", path: projectInstructionsPath() };
 }
 
 function invalidState(error: string): ProjectInstructionsState {
-	return { text: "", status: "invalid", error, path: PROJECT_INSTRUCTIONS_PATH };
+	return { text: "", status: "invalid", error, path: projectInstructionsPath() };
 }
 
 function errorMessage(error: unknown): string {

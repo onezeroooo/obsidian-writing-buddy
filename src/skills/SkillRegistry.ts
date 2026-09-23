@@ -2,7 +2,7 @@
 
 import type { Skill } from "../types";
 import type { ProjectStore, StoredSkillFile } from "../storage/ProjectStore";
-import { CUSTOM_SKILLS_DIR, SKILL_OVERRIDES_DIR } from "../storage/paths";
+import { projectPaths } from "../storage/paths";
 import { BUILTIN_SKILLS, localizeBuiltinSkill, resolveRetiredBuiltinSkillId } from "./builtinSkills";
 import { hashSkillSource } from "./skillCatalog";
 import { markLegacyCustomizationsReset, migrateLegacySkillFiles, type RemovedSkillDestination } from "./skillMigration";
@@ -131,7 +131,7 @@ export class SkillRegistry {
 		};
 		const paths = await this.overridePathsFor(id);
 		if (paths.length > 1) throw new Error(`Cannot save conflicted customization for ${id}.`);
-		const path = paths[0] ?? `${SKILL_OVERRIDES_DIR}/${id}.md`;
+		const path = paths[0] ?? `${projectPaths.skillOverridesDir}/${id}.md`;
 		if (paths.length === 0 && await this.store.fileExists(path)) {
 			throw new Error(`Refusing to overwrite unrelated skill file: ${path}`);
 		}
@@ -209,8 +209,8 @@ export class SkillRegistry {
 		if (BUILTIN_SKILLS.some((candidate) => candidate.id === parsed.skill.id)) {
 			throw new Error(`Custom skill id conflicts with built-in: ${parsed.skill.id}`);
 		}
-		const path = existingPath ?? `${CUSTOM_SKILLS_DIR}/${parsed.skill.id}.md`;
-		if (!path.startsWith(`${CUSTOM_SKILLS_DIR}/`) || !path.toLowerCase().endsWith(".md")) {
+		const path = existingPath ?? `${projectPaths.customSkillsDir}/${parsed.skill.id}.md`;
+		if (!path.startsWith(`${projectPaths.customSkillsDir}/`) || !path.toLowerCase().endsWith(".md")) {
 			throw new Error("Custom skills must be stored under WritingBuddy/skills/custom/.");
 		}
 		if (existingPath === undefined) {

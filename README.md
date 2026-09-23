@@ -43,6 +43,8 @@ Bring your own model. Every generated edit stays a candidate until you choose **
 
 Writing Buddy separates manuscript context from the model's own reasoning effort.
 
+Manuscript knowledge (novel memory) keeps a work's knowledge — events, state, relationships, what each character knows, and your own canon — current as you write, and hands a generation only what holds at the point in the story you are writing. The engine ([Recanta](https://github.com/onezeroooo/recanta-dev), on SQLite compiled to WebAssembly) is bundled into the plugin and runs on desktop and mobile; its portable knowledge files travel with the Vault, so a second device never reads a chapter twice. See [Novel memory](docs/NOVEL_MEMORY.md).
+
 | Context | What the AI can work with |
 |---|---|
 | **Auto** | Writing Buddy decides what the task needs. It can stay local, research more of the manuscript within a controlled budget, or use complete manuscript coverage when correctness depends on it. |
@@ -103,10 +105,10 @@ The interface can follow Obsidian, or use English or Chinese explicitly. The ins
 ## Privacy and your data
 
 - **No Writing Buddy account.** You connect your own provider or endpoint, under its own terms.
-- **Your project data stays in the Vault.** Conversations, project instructions, and Skills are ordinary files under `WritingBuddy/`.
+- **Your project data stays in the Vault.** Conversations, project instructions, and Skills are ordinary files under `WritingBuddy/`. That folder is yours to place: drag or rename it anywhere in the file tree and Writing Buddy follows; Settings → Data folder shows where it is and can move it. The structure inside it is fixed.
 - **Credentials stay on this device.** API keys and connection credentials are not written into synced Vault files.
 - **No telemetry or analytics.**
-- **What leaves the Vault:** when you send a turn, Writing Buddy sends the selected text, applicable instructions, relevant conversation history, and the context assembled for that request to the selected connection. Connection checks and model discovery can also contact configured endpoints; they do not send your manuscript.
+- **What leaves the Vault:** when you send a turn, Writing Buddy sends the selected text, applicable instructions, relevant conversation history, and the context assembled for that request to the selected connection. Building or updating manuscript knowledge sends each changed chapter or canon note once to your default connection. Connection checks and model discovery can also contact configured endpoints; they do not send your manuscript.
 - **Security reports:** see [SECURITY.md](SECURITY.md) for the private reporting path.
 
 The provider or endpoint you choose has its own privacy and data policies.

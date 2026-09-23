@@ -1,12 +1,12 @@
 /**
  * Where WritingBuddy keeps project data.
  *
- * Everything under this root lives *inside the vault*, so a conversation
- * belongs to the manuscript and travels with it through whatever sync the
- * writer already uses. Nothing here is machine-specific, and nothing here may
- * ever contain a credential — see `DeviceStore` for that.
+ * Everything under the project root lives *inside the vault*, so a
+ * conversation belongs to the manuscript and travels with it through whatever
+ * sync the writer already uses. Nothing here is machine-specific, and nothing
+ * here may ever contain a credential — see `DeviceStore` for that.
  *
- * The root is `WritingBuddy/`, deliberately **not** dot-prefixed:
+ * The root defaults to `WritingBuddy/`, deliberately **not** dot-prefixed:
  *
  *   - A dot-folder is hidden content as far as Obsidian is concerned. Syncing
  *     it requires Self-hosted LiveSync's Hidden File Sync, which is opt-in,
@@ -20,18 +20,131 @@
  * machinery, which is a convention from tooling rather than from manuscripts —
  * and this folder is the writer's data, not the plugin's scratch space.
  *
+ * Because it is the writer's folder, **where it sits is the writer's choice**
+ * (D-047). The root is a runtime value: the plugin reads it from its own
+ * `data.json` at load, follows the folder when the writer drags or renames it
+ * in the file tree, and offers a Settings row for the cases a drag cannot
+ * cover. Every path below is therefore a getter that reads the current root,
+ * never a constant captured at import time — a module that captured the
+ * default would keep writing to the old location after a move.
+ *
+ * What is *not* the writer's choice is the shape inside the root. The fixed
+ * children listed in `PROJECT_STRUCTURE` are the plugin's contract with
+ * itself; moving one of them out is put back, not followed.
+ *
  * Project data must never live inside `.obsidian/` either: that folder is
  * app configuration, is hidden, and is frequently excluded from sync.
  */
 
-export const PROJECT_ROOT = "WritingBuddy";
+export const DEFAULT_PROJECT_ROOT = "WritingBuddy";
 
-export const PROJECT_FILE = `${PROJECT_ROOT}/project.json`;
-/** Durable checkpoint for retryable migration from a pre-WritingBuddy root. */
-export const LEGACY_ROOT_MIGRATION_FILE = `${PROJECT_ROOT}/legacy-root-migration.json`;
-export const CONVERSATIONS_DIR = `${PROJECT_ROOT}/conversations`;
-export const EDITS_DIR = `${PROJECT_ROOT}/edits`;
-export const MEMORY_DIR = `${PROJECT_ROOT}/memory`;
+let currentRoot: string = DEFAULT_PROJECT_ROOT;
+
+/** Point every project path at a new root. Callers validate first. */
+export function setProjectRoot(root: string): void {
+	currentRoot = root;
+}
+
+/**
+ * The fixed layout under the root: the manifest and the folders the plugin
+ * owns. A rename of one of these is reverted (see `main.ts`); the root itself
+ * is the only thing the writer moves.
+ */
+export const PROJECT_STRUCTURE = [
+	"project.json",
+	"conversations",
+	"edits",
+	"memory",
+	"instructions",
+	"skills",
+] as const;
+
+/** The manifest file that marks a folder as a project root. */
+export const PROJECT_FILE_NAME = "project.json";
+
+export const projectPaths = {
+	get root(): string {
+		return currentRoot;
+	},
+	get projectFile(): string {
+		return `${currentRoot}/${PROJECT_FILE_NAME}`;
+	},
+	/** Durable checkpoint for retryable migration from a pre-WritingBuddy root. */
+	get legacyRootMigrationFile(): string {
+		return `${currentRoot}/legacy-root-migration.json`;
+	},
+	get conversationsDir(): string {
+		return `${currentRoot}/conversations`;
+	},
+	get editsDir(): string {
+		return `${currentRoot}/edits`;
+	},
+	get memoryDir(): string {
+		return `${currentRoot}/memory`;
+	},
+	/** Parent for optional writer-owned project instructions. No file is seeded. */
+	get instructionsDir(): string {
+		return `${currentRoot}/instructions`;
+	},
+	get projectInstructionsFile(): string {
+		return `${currentRoot}/instructions/project.md`;
+	},
+	get skillsDir(): string {
+		return `${currentRoot}/skills`;
+	},
+	/** Writer-authored skills that do not derive from a packaged skill. */
+	get customSkillsDir(): string {
+		return `${currentRoot}/skills/custom`;
+	},
+	/** Writer-owned customizations of immutable packaged skills. */
+	get skillOverridesDir(): string {
+		return `${currentRoot}/skills/overrides`;
+	},
+	/** Skill bookkeeping. Active skill Markdown never lives in this directory. */
+	get skillStateDir(): string {
+		return `${currentRoot}/skills/state`;
+	},
+	/** Records how each legacy flat skill file was classified, without moving it. */
+	get skillMigrationFile(): string {
+		return `${currentRoot}/skills/state/migration.json`;
+	},
+	/** Independent receipt ledger written only by the explicit Reset operation. */
+	get skillResetStateFile(): string {
+		return `${currentRoot}/skills/state/resets.json`;
+	},
+	/** The applied-edit log. Reviewable history, not an undo stack. */
+	get editHistoryFile(): string {
+		return `${currentRoot}/edits/history.json`;
+	},
+	/** Where the cache lived while it was still inside the synced project root. */
+	get legacyCacheDir(): string {
+		return `${currentRoot}/cache`;
+	},
+	get legacyFullCorpusCacheDir(): string {
+		return `${currentRoot}/cache/full-corpus`;
+	},
+	/**
+	 * Every directory the plugin expects to exist under the visible project root.
+	 *
+	 * The cache is not here. It lives outside this root (see `CACHE_DIR`) and
+	 * creates itself on first use, so a vault that never runs a Full analysis
+	 * never grows the folder at all.
+	 */
+	get directories(): readonly string[] {
+		return [
+			currentRoot,
+			this.conversationsDir,
+			this.editsDir,
+			this.memoryDir,
+			this.instructionsDir,
+			this.skillsDir,
+			this.customSkillsDir,
+			this.skillOverridesDir,
+			this.skillStateDir,
+		];
+	},
+};
+
 /**
  * Durable, plugin-owned derived data. Never treated as manuscript context.
  *
@@ -49,6 +162,11 @@ export const MEMORY_DIR = `${PROJECT_ROOT}/memory`;
  *
  * Conversations do not move here. They are the writer's own history, they are
  * meant to travel between devices, and PC-014 puts them somewhere visible.
+ *
+ * The cache also does not follow the project root when that moves. It is
+ * invisible in Obsidian, so it cannot get in the way of how a writer arranges
+ * the vault, and staying at the vault root keeps it outside sync wherever the
+ * visible data goes.
  */
 export const CACHE_DIR = ".writing-buddy-cache";
 /** Content-addressed intermediate results for resumable Full analysis. */
@@ -61,22 +179,6 @@ export const FULL_CORPUS_CACHE_DIR = `${CACHE_DIR}/full-corpus`;
  * survive a sync that replaced the real file.
  */
 export const SESSION_HISTORY_DIR = `${CACHE_DIR}/conversation-history`;
-/** Where the cache lived while it was still inside the synced project root. */
-export const LEGACY_CACHE_DIR = `${PROJECT_ROOT}/cache`;
-export const LEGACY_FULL_CORPUS_CACHE_DIR = `${LEGACY_CACHE_DIR}/full-corpus`;
-/** Parent for optional writer-owned project instructions. No file is seeded. */
-export const INSTRUCTIONS_DIR = `${PROJECT_ROOT}/instructions`;
-export const SKILLS_DIR = `${PROJECT_ROOT}/skills`;
-/** Writer-authored skills that do not derive from a packaged skill. */
-export const CUSTOM_SKILLS_DIR = `${SKILLS_DIR}/custom`;
-/** Writer-owned customizations of immutable packaged skills. */
-export const SKILL_OVERRIDES_DIR = `${SKILLS_DIR}/overrides`;
-/** Skill bookkeeping. Active skill Markdown never lives in this directory. */
-export const SKILL_STATE_DIR = `${SKILLS_DIR}/state`;
-/** Records how each legacy flat skill file was classified, without moving it. */
-export const SKILL_MIGRATION_FILE = `${SKILL_STATE_DIR}/migration.json`;
-/** Independent receipt ledger written only by the explicit Reset operation. */
-export const SKILL_RESET_STATE_FILE = `${SKILL_STATE_DIR}/resets.json`;
 
 /**
  * Roots this plugin has used before, newest first.
@@ -86,30 +188,14 @@ export const SKILL_RESET_STATE_FILE = `${SKILL_STATE_DIR}/resets.json`;
  * old folder stays where it is until they remove it themselves, because a
  * plugin quietly deleting a folder full of someone's work is not a risk worth
  * taking to save them one drag to the bin.
+ *
+ * These are always looked for at the vault root, whatever the current root is
+ * set to: they predate the root being movable.
  */
 export const LEGACY_PROJECT_ROOTS = ["_WritingBuddy", ".writing-buddy"] as const;
 
 /** The pre-1.0 hidden root. Kept as a name for the migration notice. */
 export const LEGACY_PROJECT_ROOT = ".writing-buddy";
-
-/**
- * Every directory the plugin expects to exist under the visible project root.
- *
- * The cache is not here. It lives outside this root now (see `CACHE_DIR`) and
- * creates itself on first use, so a vault that never runs a Full analysis
- * never grows the folder at all.
- */
-export const PROJECT_DIRECTORIES = [
-	PROJECT_ROOT,
-	CONVERSATIONS_DIR,
-	EDITS_DIR,
-	MEMORY_DIR,
-	INSTRUCTIONS_DIR,
-	SKILLS_DIR,
-	CUSTOM_SKILLS_DIR,
-	SKILL_OVERRIDES_DIR,
-	SKILL_STATE_DIR,
-] as const;
 
 /**
  * The manifest, and the filename every build has used for a conversation.
@@ -118,12 +204,12 @@ export const PROJECT_DIRECTORIES = [
  * a file it can refuse rather than an absence it would read as a deletion.
  */
 export function conversationPath(sessionId: string): string {
-	return `${CONVERSATIONS_DIR}/${sessionId}.json`;
+	return `${projectPaths.conversationsDir}/${sessionId}.json`;
 }
 
 /** The shard folder beside the manifest, holding the transcript itself. */
 export function conversationShardDir(sessionId: string): string {
-	return `${CONVERSATIONS_DIR}/${sessionId}`;
+	return `${projectPaths.conversationsDir}/${sessionId}`;
 }
 
 export function conversationShardPath(sessionId: string, name: string): string {
@@ -137,7 +223,7 @@ export function fullCorpusMemoPath(key: string): string {
 
 /** The same address under the pre-move synced location. Read-only. */
 export function legacyFullCorpusMemoPath(key: string): string {
-	return `${LEGACY_FULL_CORPUS_CACHE_DIR}/${key}.json`;
+	return `${projectPaths.legacyFullCorpusCacheDir}/${key}.json`;
 }
 
 /** One folder of timestamped revisions per conversation. */
@@ -145,8 +231,76 @@ export function sessionHistoryDir(sessionId: string): string {
 	return `${SESSION_HISTORY_DIR}/${sessionId}`;
 }
 
-/** The applied-edit log. Reviewable history, not an undo stack. */
-export const EDIT_HISTORY_FILE = `${EDITS_DIR}/history.json`;
+// ---------------------------------------------------------------------------
+// Root validation
+// ---------------------------------------------------------------------------
+
+/** Why a proposed root was refused. Each maps to one sentence in Settings. */
+export type ProjectRootProblem =
+	| "empty"
+	| "hidden"
+	| "config-dir"
+	| "reserved"
+	| "unsafe";
+
+export type ProjectRootCheck =
+	| { ok: true; root: string }
+	| { ok: false; problem: ProjectRootProblem };
+
+/** Tidy what a person typed into a vault-relative folder path, or `""`. */
+export function normalizeProjectRootInput(input: string): string {
+	return input
+		.replace(/\\/gu, "/")
+		.trim()
+		.replace(/^(?:\.\/)+/u, "")
+		.replace(/\/+/gu, "/")
+		.replace(/^\/+|\/+$/gu, "");
+}
+
+/**
+ * Decide whether a folder may hold project data.
+ *
+ * Refuses the vault root (there is nothing to move), anything hidden (see the
+ * file comment: hidden folders do not sync and are outside Obsidian's index),
+ * Obsidian's own configuration folder, the plugin's cache and legacy roots
+ * (the migration code treats those names as sources, never destinations), and
+ * any path that could walk outside the vault.
+ */
+export function checkProjectRoot(input: string, options: { configDir?: string | null } = {}): ProjectRootCheck {
+	const root = normalizeProjectRootInput(input);
+	if (root.length === 0) return { ok: false, problem: "empty" };
+	// eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
+	if (/[\u0000-\u001f\u007f-\u009f]/u.test(root) || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(root)) {
+		return { ok: false, problem: "unsafe" };
+	}
+	const segments = root.split("/");
+	if (segments.some((segment) => segment.length === 0 || segment !== segment.trim() || segment === "." || segment === "..")) {
+		return { ok: false, problem: "unsafe" };
+	}
+	if (segments.some((segment) => segment.startsWith("."))) return { ok: false, problem: "hidden" };
+	const configDir = options.configDir ? normalizeProjectRootInput(options.configDir) : null;
+	if (configDir && (root === configDir || root.startsWith(`${configDir}/`))) return { ok: false, problem: "config-dir" };
+	const reserved: readonly string[] = [CACHE_DIR, ...LEGACY_PROJECT_ROOTS];
+	if (reserved.some((name) => root === name || root.startsWith(`${name}/`))) return { ok: false, problem: "reserved" };
+	return { ok: true, root };
+}
+
+/** True when `path` is `root` itself or lies beneath it. */
+export function isWithinRoot(path: string, root: string): boolean {
+	return path === root || path.startsWith(`${root}/`);
+}
+
+/**
+ * Where `path` lands after the folder `from` is renamed to `to`, or `null`
+ * when the rename does not touch it. Covers a rename of the root itself and a
+ * rename of any ancestor: `03-tools` → `03-Tools` moves `03-tools/WritingBuddy`
+ * just as surely as dragging the folder does.
+ */
+export function relocatedPath(path: string, from: string, to: string): string | null {
+	if (path === from) return to;
+	if (path.startsWith(`${from}/`)) return `${to}${path.slice(from.length)}`;
+	return null;
+}
 
 /**
  * A minimal filesystem, satisfied by Obsidian's vault adapter and by an
@@ -162,6 +316,12 @@ export interface VaultFs {
 	mkdir(path: string): Promise<void>;
 	list(path: string): Promise<{ files: string[]; folders: string[] }>;
 	remove(path: string): Promise<void>;
+	/**
+	 * Optional atomic move, used to make a file appear whole (write beside it,
+	 * then rename over it). Without it, writers fall back to a direct write and
+	 * rely on the checksums inside the file to detect a torn one.
+	 */
+	rename?(from: string, to: string): Promise<void>;
 	/**
 	 * Optional file metadata, used only to evict the oldest cache entries.
 	 *

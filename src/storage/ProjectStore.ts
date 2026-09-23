@@ -12,29 +12,14 @@ import type { ConversationSession, EditToken, ProjectMetadata } from "../types";
 import { isSafeSessionId, nowIso } from "../util/id";
 import { mapWithConcurrency } from "../util/pool";
 import {
-	CONVERSATIONS_DIR,
-	CUSTOM_SKILLS_DIR,
-	EDITS_DIR,
-	EDIT_HISTORY_FILE,
-	INSTRUCTIONS_DIR,
 	LEGACY_PROJECT_ROOTS,
-	LEGACY_ROOT_MIGRATION_FILE,
-	MEMORY_DIR,
 	CACHE_DIR,
 	FULL_CORPUS_CACHE_DIR,
-	LEGACY_CACHE_DIR,
-	LEGACY_FULL_CORPUS_CACHE_DIR,
-	PROJECT_DIRECTORIES,
-	PROJECT_FILE,
-	PROJECT_ROOT,
-	SKILLS_DIR,
-	SKILL_MIGRATION_FILE,
-	SKILL_RESET_STATE_FILE,
-	SKILL_OVERRIDES_DIR,
 	type VaultFs,
 	conversationPath,
 	conversationShardDir,
 	conversationShardPath,
+	projectPaths,
 } from "./paths";
 import {
 	serializeSession, serializeSessionAsInline, validateSession,
@@ -47,6 +32,14 @@ import {
 import type { SessionHistoryStore } from "./SessionHistoryStore";
 
 export const PROJECT_SCHEMA_VERSION = 1;
+
+/** A write was refused because the project root is not there to write into. */
+export class ProjectRootUnavailableError extends Error {
+	constructor() {
+		super(t("main.rootUnavailableWrite"));
+		this.name = "ProjectRootUnavailableError";
+	}
+}
 
 /** How many applied edits are kept for review. Undo is separate and narrower. */
 export const EDIT_HISTORY_LIMIT = 50;
@@ -141,15 +134,60 @@ export class ProjectStore {
 		private readonly history?: SessionHistoryStore,
 	) {}
 
+	/**
+	 * Set while the project root is known to be gone.
+	 *
+	 * Every write path creates missing directories on its way, which is the
+	 * right reflex for a deleted subfolder and exactly the wrong one for a root
+	 * that sync is in the middle of moving or that the writer just dragged to
+	 * the bin: the next saved message would conjure an empty root at the old
+	 * location and the vault would end up with two. While this is set, writes
+	 * fail with `ProjectRootUnavailableError` instead; reads are unaffected.
+	 */
+	private rootUnavailable = false;
+
 	/** Create the directory layout. Safe to call on every load. */
 	async ensureLayout(): Promise<void> {
 		if (this.layoutReady) return;
-		for (const directory of PROJECT_DIRECTORIES) {
+		if (this.rootUnavailable) throw new ProjectRootUnavailableError();
+		// The root can sit several folders deep; the adapter is not relied on
+		// to create the folders above it. Below the root, every directory is
+		// listed parent-first, so one existence check each is enough.
+		await this.ensureParentDirectories(projectPaths.root);
+		for (const directory of projectPaths.directories) {
 			if (!(await this.fs.exists(directory))) {
 				await this.fs.mkdir(directory);
 			}
 		}
 		this.layoutReady = true;
+	}
+
+	/**
+	 * The root moved or came back: forget the cached layout so the next write
+	 * checks the new location, and allow writes again.
+	 */
+	rootChanged(): void {
+		this.layoutReady = false;
+		this.rootUnavailable = false;
+	}
+
+	/** The root is gone. Refuse writes until `rootChanged` says otherwise. */
+	markRootUnavailable(): void {
+		this.layoutReady = false;
+		this.rootUnavailable = true;
+	}
+
+	get isRootUnavailable(): boolean {
+		return this.rootUnavailable;
+	}
+
+	private async ensureDirectory(directory: string): Promise<void> {
+		const parts = directory.split("/");
+		let current = "";
+		for (const part of parts) {
+			current = current ? `${current}/${part}` : part;
+			if (!(await this.fs.exists(current))) await this.fs.mkdir(current);
+		}
 	}
 
 	/**
@@ -168,12 +206,12 @@ export class ProjectStore {
 	 * genuinely empty, so nothing unexpected is swept away with it.
 	 */
 	async migrateCacheOutOfProjectRoot(): Promise<{ moved: number; remaining: number }> {
-		if (!(await this.fs.exists(LEGACY_FULL_CORPUS_CACHE_DIR))) return { moved: 0, remaining: 0 };
+		if (!(await this.fs.exists(projectPaths.legacyFullCorpusCacheDir))) return { moved: 0, remaining: 0 };
 		let moved = 0;
 		let remaining = 0;
 		let listed: { files: string[]; folders: string[] };
 		try {
-			listed = await this.fs.list(LEGACY_FULL_CORPUS_CACHE_DIR);
+			listed = await this.fs.list(projectPaths.legacyFullCorpusCacheDir);
 		} catch {
 			return { moved: 0, remaining: 0 };
 		}
@@ -197,7 +235,7 @@ export class ProjectStore {
 			}
 		}
 		if (remaining === 0) {
-			for (const directory of [LEGACY_FULL_CORPUS_CACHE_DIR, LEGACY_CACHE_DIR]) {
+			for (const directory of [projectPaths.legacyFullCorpusCacheDir, projectPaths.legacyCacheDir]) {
 				try {
 					const rest = await this.fs.list(directory);
 					if (rest.files.length === 0 && rest.folders.length === 0) await this.fs.remove(directory);
@@ -235,6 +273,7 @@ export class ProjectStore {
 		try {
 			await write();
 		} catch (error) {
+			if (this.rootUnavailable) throw error;
 			this.layoutReady = false;
 			await this.ensureLayout();
 			try {
@@ -255,8 +294,8 @@ export class ProjectStore {
 	 */
 	async migrateLegacyRoot(): Promise<MigrationReport> {
 		const report: MigrationReport = { ran: false, copied: [], failed: [] };
-		const rootExists = await this.fs.exists(PROJECT_ROOT);
-		const checkpointFileExists = rootExists && await this.fs.exists(LEGACY_ROOT_MIGRATION_FILE);
+		const rootExists = await this.fs.exists(projectPaths.root);
+		const checkpointFileExists = rootExists && await this.fs.exists(projectPaths.legacyRootMigrationFile);
 		const checkpoint = checkpointFileExists ? await this.readLegacyRootMigrationCheckpoint() : null;
 		if (checkpoint?.status === "complete") return report;
 
@@ -322,13 +361,13 @@ export class ProjectStore {
 			}
 		};
 
-		await stageFile(`${source}/project.json`, PROJECT_FILE);
+		await stageFile(`${source}/project.json`, projectPaths.projectFile);
 
 		for (const [legacySub, target] of [
-			["conversations", CONVERSATIONS_DIR],
-			["edits", EDITS_DIR],
-			["memory", MEMORY_DIR],
-			["skills", SKILLS_DIR],
+			["conversations", projectPaths.conversationsDir],
+			["edits", projectPaths.editsDir],
+			["memory", projectPaths.memoryDir],
+			["skills", projectPaths.skillsDir],
 		] as const) {
 			await stageTree(`${source}/${legacySub}`, target);
 		}
@@ -336,9 +375,9 @@ export class ProjectStore {
 		if (report.failed.length > 0) return report;
 		await this.ensureLayout();
 		try {
-			await this.fs.write(LEGACY_ROOT_MIGRATION_FILE, legacyRootCheckpoint(source, "in-progress"));
+			await this.fs.write(projectPaths.legacyRootMigrationFile, legacyRootCheckpoint(source, "in-progress"));
 		} catch (error) {
-			report.failed.push(`${LEGACY_ROOT_MIGRATION_FILE}: ${(error as Error).message}`);
+			report.failed.push(`${projectPaths.legacyRootMigrationFile}: ${(error as Error).message}`);
 			return report;
 		}
 
@@ -363,9 +402,9 @@ export class ProjectStore {
 		}
 		if (report.failed.length === 0) {
 			try {
-				await this.fs.write(LEGACY_ROOT_MIGRATION_FILE, legacyRootCheckpoint(source, "complete"));
+				await this.fs.write(projectPaths.legacyRootMigrationFile, legacyRootCheckpoint(source, "complete"));
 			} catch (error) {
-				report.failed.push(`${LEGACY_ROOT_MIGRATION_FILE}: ${(error as Error).message}`);
+				report.failed.push(`${projectPaths.legacyRootMigrationFile}: ${(error as Error).message}`);
 			}
 		}
 
@@ -373,10 +412,10 @@ export class ProjectStore {
 	}
 
 	private async hasEstablishedCurrentData(): Promise<boolean> {
-		for (const path of [PROJECT_FILE, EDIT_HISTORY_FILE, SKILL_MIGRATION_FILE, SKILL_RESET_STATE_FILE]) {
+		for (const path of [projectPaths.projectFile, projectPaths.editHistoryFile, projectPaths.skillMigrationFile, projectPaths.skillResetStateFile]) {
 			if (await this.fs.exists(path)) return true;
 		}
-		for (const directory of [CONVERSATIONS_DIR, MEMORY_DIR, INSTRUCTIONS_DIR, SKILLS_DIR]) {
+		for (const directory of [projectPaths.conversationsDir, projectPaths.memoryDir, projectPaths.instructionsDir, projectPaths.skillsDir]) {
 			if (await this.treeContainsAnyFile(directory)) return true;
 		}
 		return false;
@@ -400,8 +439,8 @@ export class ProjectStore {
 
 	private async readLegacyRootMigrationCheckpoint(): Promise<LegacyRootMigrationCheckpoint | null> {
 		try {
-			if (!(await this.fs.exists(LEGACY_ROOT_MIGRATION_FILE))) return null;
-			const decoded = JSON.parse(await this.fs.read(LEGACY_ROOT_MIGRATION_FILE)) as Record<string, unknown>;
+			if (!(await this.fs.exists(projectPaths.legacyRootMigrationFile))) return null;
+			const decoded = JSON.parse(await this.fs.read(projectPaths.legacyRootMigrationFile)) as Record<string, unknown>;
 			if (decoded.schemaVersion !== 1 || !LEGACY_PROJECT_ROOTS.includes(decoded.source as typeof LEGACY_PROJECT_ROOTS[number]) ||
 				(decoded.status !== "in-progress" && decoded.status !== "complete")) return null;
 			return { schemaVersion: 1, source: decoded.source as typeof LEGACY_PROJECT_ROOTS[number], status: decoded.status };
@@ -411,12 +450,8 @@ export class ProjectStore {
 	}
 
 	private async ensureParentDirectories(filePath: string): Promise<void> {
-		const parts = filePath.split("/").slice(0, -1);
-		let current = "";
-		for (const part of parts) {
-			current = current ? `${current}/${part}` : part;
-			if (!(await this.fs.exists(current))) await this.fs.mkdir(current);
-		}
+		const parent = filePath.split("/").slice(0, -1).join("/");
+		if (parent.length > 0) await this.ensureDirectory(parent);
 	}
 
 	/**
@@ -436,14 +471,14 @@ export class ProjectStore {
 			displayName: this.defaultDisplayName,
 		};
 
-		if (!(await this.fs.exists(PROJECT_FILE))) {
+		if (!(await this.fs.exists(projectPaths.projectFile))) {
 			await this.saveProjectMetadata(fallback);
 			return { metadata: fallback, migratedFromProjectId: null };
 		}
 
 		let decoded: Record<string, unknown>;
 		try {
-			decoded = JSON.parse(await this.fs.read(PROJECT_FILE)) as Record<string, unknown>;
+			decoded = JSON.parse(await this.fs.read(projectPaths.projectFile)) as Record<string, unknown>;
 		} catch {
 			// A corrupted metadata file must not make the vault unusable, and it
 			// holds nothing that cannot be regenerated.
@@ -474,15 +509,15 @@ export class ProjectStore {
 
 	async saveProjectMetadata(metadata: ProjectMetadata): Promise<void> {
 		await this.withLayout(() =>
-			this.fs.write(PROJECT_FILE, `${JSON.stringify(metadata, null, "\t")}\n`),
+			this.fs.write(projectPaths.projectFile, `${JSON.stringify(metadata, null, "\t")}\n`),
 		);
 	}
 
 	// --- conversations -----------------------------------------------------
 
 	async listSessionIds(): Promise<string[]> {
-		if (!(await this.fs.exists(CONVERSATIONS_DIR))) return [];
-		const { files } = await this.fs.list(CONVERSATIONS_DIR);
+		if (!(await this.fs.exists(projectPaths.conversationsDir))) return [];
+		const { files } = await this.fs.list(projectPaths.conversationsDir);
 		return files
 			.map((path) => path.split("/").pop() ?? "")
 			.filter((name) => name.endsWith(".json"))
@@ -818,7 +853,7 @@ export class ProjectStore {
 		local: { files: number; bytes: number };
 	}> {
 		return {
-			synced: await this.measureTree(PROJECT_ROOT),
+			synced: await this.measureTree(projectPaths.root),
 			local: await this.measureTree(CACHE_DIR),
 		};
 	}
@@ -909,9 +944,9 @@ export class ProjectStore {
 	// --- edit history ------------------------------------------------------
 
 	async loadEditHistory(): Promise<EditToken[]> {
-		if (!(await this.fs.exists(EDIT_HISTORY_FILE))) return [];
+		if (!(await this.fs.exists(projectPaths.editHistoryFile))) return [];
 		try {
-			const decoded: unknown = JSON.parse(await this.fs.read(EDIT_HISTORY_FILE));
+			const decoded: unknown = JSON.parse(await this.fs.read(projectPaths.editHistoryFile));
 			if (!Array.isArray(decoded)) return [];
 			return decoded.filter(isEditToken);
 		} catch {
@@ -922,7 +957,7 @@ export class ProjectStore {
 	async saveEditHistory(tokens: EditToken[]): Promise<void> {
 		const trimmed = tokens.slice(-EDIT_HISTORY_LIMIT);
 		await this.withLayout(() =>
-			this.fs.write(EDIT_HISTORY_FILE, `${JSON.stringify(trimmed, null, "\t")}\n`),
+			this.fs.write(projectPaths.editHistoryFile, `${JSON.stringify(trimmed, null, "\t")}\n`),
 		);
 	}
 
@@ -941,10 +976,10 @@ export class ProjectStore {
 	async listStoredSkillFiles(options: { includeLegacy?: boolean } = {}): Promise<StoredSkillFile[]> {
 		const groups: StoredSkillFile[][] = [];
 		const locations: Array<readonly [string, StoredSkillLocation]> = [
-			[CUSTOM_SKILLS_DIR, "custom"],
-			[SKILL_OVERRIDES_DIR, "override"],
+			[projectPaths.customSkillsDir, "custom"],
+			[projectPaths.skillOverridesDir, "override"],
 		];
-		if (options.includeLegacy !== false) locations.push([SKILLS_DIR, "legacy"]);
+		if (options.includeLegacy !== false) locations.push([projectPaths.skillsDir, "legacy"]);
 		for (const [directory, location] of locations) {
 			if (!(await this.fs.exists(directory))) {
 				groups.push([]);
@@ -972,21 +1007,21 @@ export class ProjectStore {
 	}
 
 	async readSkillMigrationManifest(): Promise<string | null> {
-		if (!(await this.fs.exists(SKILL_MIGRATION_FILE))) return null;
-		return this.fs.read(SKILL_MIGRATION_FILE);
+		if (!(await this.fs.exists(projectPaths.skillMigrationFile))) return null;
+		return this.fs.read(projectPaths.skillMigrationFile);
 	}
 
 	async writeSkillMigrationManifest(contents: string): Promise<void> {
-		await this.withLayout(() => this.fs.write(SKILL_MIGRATION_FILE, contents));
+		await this.withLayout(() => this.fs.write(projectPaths.skillMigrationFile, contents));
 	}
 
 	async readSkillResetState(): Promise<string | null> {
-		if (!(await this.fs.exists(SKILL_RESET_STATE_FILE))) return null;
-		return this.fs.read(SKILL_RESET_STATE_FILE);
+		if (!(await this.fs.exists(projectPaths.skillResetStateFile))) return null;
+		return this.fs.read(projectPaths.skillResetStateFile);
 	}
 
 	async writeSkillResetState(contents: string): Promise<void> {
-		await this.withLayout(() => this.fs.write(SKILL_RESET_STATE_FILE, contents));
+		await this.withLayout(() => this.fs.write(projectPaths.skillResetStateFile, contents));
 	}
 
 	async fileExists(path: string): Promise<boolean> {

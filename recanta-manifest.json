@@ -1,0 +1,9 @@
+{
+	"package": "recanta-dev",
+	"commit": "89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b",
+	"version": "0.1.0",
+	"engine": "recanta",
+	"schemaVersion": 6,
+	"artifactFormat": 1,
+	"source": "private build-time dependency; embedded into main.js, never installed or fetched at run time"
+}

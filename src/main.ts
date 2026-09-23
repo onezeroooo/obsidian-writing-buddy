@@ -7,7 +7,7 @@
  * lives in a module that can be tested without Obsidian.
  */
 
-import { MarkdownView, Notice, Plugin, TFile, normalizePath, requestUrl, type TAbstractFile } from "obsidian";
+import { MarkdownView, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, type TAbstractFile } from "obsidian";
 import type { App } from "obsidian";
 import type { WorkspaceLeaf } from "obsidian";
 import type { Editor } from "obsidian";
@@ -25,13 +25,20 @@ import { setVaultConfigDir } from "./context/eligibility";
 import { knownEvidenceKindLabels } from "./context/evidence";
 import { ObsidianVaultFs } from "./obsidianVaultFs";
 import { ObsidianVaultReader } from "./obsidianVaultReader";
+import { DEFAULT_NOVEL_MEMORY_CONCURRENCY, NovelMemoryRuntime } from "./memory/novelMemoryRuntime";
+import { sqlJsEngineFactory } from "./memory/recantaEngine";
+import { sqlJsWasm } from "./memory/sqljsWasm";
+import { BackendExtractionProvider, extractionEffortFor } from "./memory/backendExtraction";
+import { RECANTA_MANIFEST, type RecantaManifest } from "./memory/recantaManifest";
 import { revealExactCitation } from "./navigation/citationRange";
 import { ContextAssembler } from "./context/ContextAssembler";
 import { ProjectStore, type MigrationReport } from "./storage/ProjectStore";
 import { SessionHistoryStore } from "./storage/SessionHistoryStore";
 import { RestoreConversationModal, readableStamp, type RestorableRevision } from "./ui/restoreConversationModal";
+import { ConfirmModal } from "./ui/modals";
 import { parseSession } from "./storage/conversationSchema";
-import { PROJECT_ROOT } from "./storage/paths";
+import { projectPaths } from "./storage/paths";
+import { ProjectRootController } from "./projectRootController";
 import { projectDataPath } from "./sync/projectDataEvents";
 import {
 	DeviceStore,
@@ -80,8 +87,28 @@ export interface ResolvedEditor {
 	filePath: string;
 }
 
+/** How long after a keystroke a Vault change to that file still counts as the writer's own. */
+const EDITED_HERE_WINDOW_MS = 30_000;
+
+/**
+ * Opens the bundled memory engine once and reports its identity. A build
+ * check calls this against `main.js` under a browser-like global to prove the
+ * engine the bundle carries needs nothing the mobile app lacks.
+ */
+export async function probeNovelMemoryEngine(): Promise<{ engine: { name: string; version: string }; schemaVersion: number; artifactFormat: number; acceleration: string; manifest: RecantaManifest }> {
+	const handle = await sqlJsEngineFactory(sqlJsWasm)({ provider: { fingerprint: "probe", method: "model", extract: () => Promise.reject(new Error("probe")) } });
+	try {
+		const info = handle.engine.engineInfo();
+		return { engine: info.engine, schemaVersion: info.schemaVersion, artifactFormat: info.artifactFormat, acceleration: info.acceleration, manifest: RECANTA_MANIFEST };
+	} finally {
+		handle.close();
+	}
+}
+
 export default class WritingBuddyPlugin extends Plugin {
 	projectStore!: ProjectStore;
+	/** Where the project root is, and the follow/recover behaviour around it. */
+	projectRoot!: ProjectRootController;
 	deviceStore!: DeviceStore;
 	deviceSettings!: DeviceSettings;
 	skills!: SkillRegistry;
@@ -129,6 +156,12 @@ export default class WritingBuddyPlugin extends Plugin {
 	migration: MigrationReport | null = null;
 
 	private vaultFs!: ObsidianVaultFs;
+	private vaultReader!: ObsidianVaultReader;
+	/** Novel memory: the book's knowledge, kept current in the background. */
+	novelMemory!: NovelMemoryRuntime;
+	private lastNovelMemoryState: string | null = null;
+	/** Paths the writer typed into recently, by last keystroke; a Vault change to any other path came from elsewhere. */
+	private readonly editedPaths = new Map<string, number>();
 	private backend!: AIBackend;
 	private ready!: Promise<void>;
 	private markReady!: () => void;
@@ -167,6 +200,7 @@ export default class WritingBuddyPlugin extends Plugin {
 			this.app.vault.getName(),
 			new SessionHistoryStore(this.vaultFs),
 		);
+		this.projectRoot = new ProjectRootController(this, this.vaultFs);
 		this.skills = new SkillRegistry(this.projectStore);
 		this.sessions = new SessionManager(this.projectStore, (conflict) => {
 			const preferences = this.vaultState.sessionPreferences(conflict.originalSessionId);
@@ -181,7 +215,18 @@ export default class WritingBuddyPlugin extends Plugin {
 			this.refreshSelectionHighlights();
 		});
 		const vaultReader = new ObsidianVaultReader(this.app);
+		this.vaultReader = vaultReader;
 		this.contextAssembler = new ContextAssembler(vaultReader);
+		this.novelMemory = new NovelMemoryRuntime({
+			fs: this.vaultFs,
+			reader: vaultReader,
+			writer: `Writing Buddy ${this.manifest.version}`,
+			engine: sqlJsEngineFactory(sqlJsWasm),
+			extraction: () => this.novelExtractionProvider(),
+			// A phone, or a model on this machine, reads one document at a time.
+			concurrency: () => (Platform.isMobile || this.novelExtractionConnectionIsLocal() ? 1 : DEFAULT_NOVEL_MEMORY_CONCURRENCY),
+			onStatus: (status) => this.novelMemoryStatusChanged(status.state),
+		});
 		this.connectionRegistry = new BackendRegistry({
 			connections: this.deviceSettings.connections,
 			onChange: () => this.refreshViews(),
@@ -297,6 +342,7 @@ export default class WritingBuddyPlugin extends Plugin {
 	onunload(): void {
 		for (const timer of this.projectEventTimers.values()) window.clearTimeout(timer);
 		this.projectEventTimers.clear();
+		void this.novelMemory?.dispose();
 		this.selectionBridge?.dispose();
 		this.selectionEditorViews.clear();
 		// Obsidian does not wait for unload; in-flight work is cancelled in the background.
@@ -360,6 +406,14 @@ export default class WritingBuddyPlugin extends Plugin {
 			profile ? profile.measure(label, run) : run();
 
 		try {
+			// Where the root is comes first: everything below reads from it. A
+			// root that is recorded but absent stops here — the writer is told,
+			// and nothing is created (see `ProjectRootController`).
+			const proceed = await step(t("main.stepResolveRoot"), () => this.projectRoot.resolveAtStartup());
+			if (!proceed) {
+				this.loadError = null;
+				return;
+			}
 			// One-time copy out of the pre-1.0 hidden root, before anything else
 			// looks at the new location.
 			const migration = await step(t("main.stepMigrateLegacy"), () => this.projectStore.migrateLegacyRoot());
@@ -372,46 +426,13 @@ export default class WritingBuddyPlugin extends Plugin {
 					);
 				} else {
 					new Notice(
-						t("main.migrationDone", { from: migration.from ?? "", count: migration.copied.length, root: PROJECT_ROOT }),
+						t("main.migrationDone", { from: migration.from ?? "", count: migration.copied.length, root: projectPaths.root }),
 						12_000,
 					);
 				}
 			}
 
-			await step(t("main.stepEnsureLayout"), () => this.projectStore.ensureLayout());
-			// Derived Full-analysis memos leave the synced root. Silent on purpose:
-			// nothing the writer owns moves, and a partial move simply retries on
-			// the next launch.
-			void this.projectStore.migrateCacheOutOfProjectRoot().catch(() => undefined);
-			const project = await step(t("main.stepReadProject"), () =>
-				this.projectStore.loadProjectMetadata(),
-			);
-			this.projectMetadata = project.metadata;
-			// The project's language for prompts and built-in skill instructions;
-			// it must be resolved before the skill registry loads below.
-			setInstructionLocale(resolveInstructionLocale(project.metadata.instructionLanguage));
-
-			// An older version keyed the remembered conversation by a generated
-			// project id. Carry that value over before the id disappears, so the
-			// writer still lands where they left off.
-			if (project.migratedFromProjectId) {
-				const remembered = this.deviceStore.legacyLastActiveSession(project.migratedFromProjectId);
-				if (remembered && !this.vaultState.lastActiveSession()) {
-					this.vaultState.setLastActiveSession(remembered);
-				}
-				this.deviceStore.clearLegacyLastActiveSession(project.migratedFromProjectId);
-			}
-
-			await step(t("main.stepLoadSkills"), () => this.skills.reload());
-			await step(t("main.stepLoadSessions"), () => this.sessions.load(this.vaultState.lastActiveSession()));
-			this.vaultState.retainSessionPreferences(this.sessions.all().map((session) => session.id));
-			if (this.sessions.count >= SESSION_RECOMMENDED_LIMIT) {
-				new Notice(
-					t("main.sessionLimit", { count: this.sessions.count, limit: SESSION_RECOMMENDED_LIMIT }),
-					10_000,
-				);
-			}
-			this.editHistory = await step(t("main.stepLoadEdits"), () => this.projectStore.loadEditHistory());
+			await this.loadProjectData(step);
 			this.loadError = null;
 
 			// Best-effort startup discovery lets the Composer offer only capabilities
@@ -429,6 +450,89 @@ export default class WritingBuddyPlugin extends Plugin {
 			this.refreshSelectionHighlights();
 			profile?.mark(t("main.firstRender"));
 		}
+	}
+
+	/**
+	 * Read everything that lives under the project root.
+	 *
+	 * Shared by startup and by a root change: when the folder moves, or is
+	 * chosen anew in Settings, what was read from the old location is read
+	 * again from the new one rather than patched in place.
+	 */
+	private async loadProjectData(step: <T>(label: string, run: () => Promise<T>) => Promise<T>): Promise<void> {
+		await step(t("main.stepEnsureLayout"), () => this.projectStore.ensureLayout());
+		// Derived Full-analysis memos leave the synced root. Silent on purpose:
+		// nothing the writer owns moves, and a partial move simply retries on
+		// the next launch.
+		void this.projectStore.migrateCacheOutOfProjectRoot().catch(() => undefined);
+		const project = await step(t("main.stepReadProject"), () =>
+			this.projectStore.loadProjectMetadata(),
+		);
+		this.projectMetadata = project.metadata;
+		// The project's language for prompts and built-in skill instructions;
+		// it must be resolved before the skill registry loads below.
+		setInstructionLocale(resolveInstructionLocale(project.metadata.instructionLanguage));
+
+		// An older version keyed the remembered conversation by a generated
+		// project id. Carry that value over before the id disappears, so the
+		// writer still lands where they left off.
+		if (project.migratedFromProjectId) {
+			const remembered = this.deviceStore.legacyLastActiveSession(project.migratedFromProjectId);
+			if (remembered && !this.vaultState.lastActiveSession()) {
+				this.vaultState.setLastActiveSession(remembered);
+			}
+			this.deviceStore.clearLegacyLastActiveSession(project.migratedFromProjectId);
+		}
+
+		await step(t("main.stepLoadSkills"), () => this.skills.reload());
+		await step(t("main.stepLoadSessions"), () => this.sessions.load(this.vaultState.lastActiveSession()));
+		// Novel memory reconciles with the Vault and resumes queued work. It
+		// is an aid, never a gate: a failure here leaves the writer's tools intact.
+		try {
+			await this.novelMemory.start();
+		} catch (error) {
+			console.error("[WritingBuddy] Novel memory failed to start", error);
+		}
+		this.vaultState.retainSessionPreferences(this.sessions.all().map((session) => session.id));
+		if (this.sessions.count >= SESSION_RECOMMENDED_LIMIT) {
+			new Notice(
+				t("main.sessionLimit", { count: this.sessions.count, limit: SESSION_RECOMMENDED_LIMIT }),
+				10_000,
+			);
+		}
+		this.editHistory = await step(t("main.stepLoadEdits"), () => this.projectStore.loadEditHistory());
+	}
+
+	/**
+	 * The root changed: re-read project data from where it is now.
+	 *
+	 * Sequenced behind pending project-data events so a reload never
+	 * interleaves with a conversation refresh that was already queued.
+	 */
+	reloadProjectData(): Promise<void> {
+		const run = async (): Promise<void> => {
+			const previousActiveId = this.sessions.getActiveId();
+			try {
+				await this.loadProjectData((_label, task) => task());
+				this.loadError = null;
+			} catch (error) {
+				this.loadError = describe(error);
+				new Notice(t("main.initFailed", { reason: this.loadError }));
+			}
+			if (this.sessions.getActiveId() !== previousActiveId) this.conversationChanged();
+			this.rememberActiveSession();
+			this.refreshViews();
+			this.refreshSelectionHighlights();
+		};
+		this.projectEventChain = this.projectEventChain.then(run).catch((error) => {
+			console.error("[WritingBuddy] Project data reload failed", error);
+		});
+		return this.projectEventChain;
+	}
+
+	/** Something about the page changed that only Settings shows. */
+	refreshSettings(): void {
+		this.settingTab?.refresh();
 	}
 
 	/** Resolves once project data has been loaded (or has failed to load). */
@@ -471,6 +575,45 @@ export default class WritingBuddyPlugin extends Plugin {
 			id: "restore-conversation-from-local-history",
 			name: t("main.cmdRestoreConversation"),
 			callback: () => void this.restoreConversationFromHistory(),
+		});
+
+		this.addCommand({
+			id: "build-novel-memory",
+			name: t("main.cmdBuildNovelMemory"),
+			callback: () => void this.buildNovelMemory(),
+		});
+
+		this.addCommand({
+			id: "rebuild-novel-memory",
+			name: t("main.cmdRebuildNovelMemory"),
+			callback: () => void this.rebuildNovelMemory(),
+		});
+
+		this.addCommand({
+			id: "retry-novel-memory",
+			name: t("main.cmdRetryNovelMemory"),
+			callback: () => void this.retryNovelMemory(),
+		});
+
+		this.addCommand({
+			id: "pause-novel-memory",
+			name: t("main.cmdPauseNovelMemory"),
+			callback: () => this.pauseNovelMemory(),
+		});
+
+		this.addCommand({
+			id: "resume-novel-memory",
+			name: t("main.cmdResumeNovelMemory"),
+			callback: () => void this.resumeNovelMemory(),
+		});
+
+		// Whole-manuscript analysis is an explicit operation, not a Context
+		// setting: it runs the Composer's current question once with complete
+		// coverage and leaves the conversation's ordinary Context untouched.
+		this.addCommand({
+			id: "analyze-whole-manuscript",
+			name: t("main.cmdWholeManuscript"),
+			callback: () => void this.activateView().then(() => this.views()[0]?.sendWholeManuscript()),
 		});
 	}
 
@@ -552,10 +695,156 @@ export default class WritingBuddyPlugin extends Plugin {
 	}
 
 	private registerProjectDataEvents(): void {
-		this.registerEvent(this.app.vault.on("create", (file) => this.queueProjectDataEvent("create", file)));
-		this.registerEvent(this.app.vault.on("modify", (file) => this.queueProjectDataEvent("modify", file)));
-		this.registerEvent(this.app.vault.on("delete", (file) => this.queueProjectDataEvent("delete", file)));
-		this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.queueProjectDataEvent("rename", file, oldPath)));
+		// A keystroke marks its file as edited here; a modify event for any other
+		// file came from sync or another tool and is told so, because its
+		// artifacts are probably on their way and no model should be asked twice.
+		this.registerEvent(this.app.workspace.on("editor-change", (_editor, info) => {
+			const path = info.file?.path;
+			if (path) this.editedPaths.set(path, Date.now());
+		}));
+		const external = (path: string): boolean => Date.now() - (this.editedPaths.get(path) ?? 0) > EDITED_HERE_WINDOW_MS;
+		// The root controller sees every event first: a drag of the root is
+		// adopted before its child events are classified against the new
+		// location, and a rename of a fixed subfolder is put back rather than
+		// processed as data leaving the project.
+		this.registerEvent(this.app.vault.on("create", (file) => {
+			this.projectRoot.onCreate(file);
+			this.queueProjectDataEvent("create", file);
+			this.novelMemory.notify({ kind: "create", path: file.path, external: external(file.path) });
+		}));
+		this.registerEvent(this.app.vault.on("modify", (file) => {
+			this.queueProjectDataEvent("modify", file);
+			this.novelMemory.notify({ kind: "modify", path: file.path, external: external(file.path) });
+		}));
+		this.registerEvent(this.app.vault.on("delete", (file) => {
+			this.projectRoot.onDelete(file);
+			this.queueProjectDataEvent("delete", file);
+			this.novelMemory.notify({ kind: "delete", path: file.path });
+		}));
+		this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+			this.novelMemory.notify({ kind: "rename", path: file.path, oldPath });
+			if (this.projectRoot.onRename(file, oldPath)) return;
+			if (this.projectRoot.isRelocationEcho(oldPath, file.path)) return;
+			this.queueProjectDataEvent("rename", file, oldPath);
+		}));
+	}
+
+	/**
+	 * The model that reads the manuscript for novel knowledge: the writer's
+	 * default connection and model, through the same backend every turn uses.
+	 * Null when no connection is configured; the engine then only learns from
+	 * artifacts other devices synchronized.
+	 */
+	/** True when the connection novel knowledge would read through runs on this machine (Ollama, llama.cpp). */
+	private novelExtractionConnectionIsLocal(): boolean {
+		const defaults = this.deviceSettings.newConversationDefaults;
+		const connectionId = defaults.connectionId ?? this.deviceSettings.connections.find((item) => item.enabled)?.id;
+		return this.deviceSettings.connections.find((item) => item.id === connectionId)?.type === "local";
+	}
+
+	private novelExtractionProvider(): BackendExtractionProvider | null {
+		const defaults = this.deviceSettings.newConversationDefaults;
+		const connectionId = defaults.connectionId ?? this.deviceSettings.connections.find((item) => item.enabled)?.id;
+		if (!connectionId) return null;
+		const backend = this.connectionRegistry.backendFor(connectionId);
+		const provider = defaults.connectionId === connectionId ? defaults.provider : undefined;
+		const model = defaults.connectionId === connectionId ? defaults.model : undefined;
+		if (!backend || !provider || !model) return null;
+		const effort = extractionEffortFor(this.effortsForConnectionProvider(connectionId, provider, model), defaults.effort ?? null);
+		return new BackendExtractionProvider({ backend, connectionId, provider, model, effort, availability: this.novelMemory.availability });
+	}
+
+	/** The lightweight states the interface shows; transitions worth a word get one. */
+	private novelMemoryStatusChanged(state: string): void {
+		const previous = this.lastNovelMemoryState;
+		this.lastNovelMemoryState = state;
+		if (previous !== null && previous !== state) {
+			if (state === "updated" && (previous === "building" || previous === "rebuilding")) new Notice(t("memory.updated"), 4000);
+			if (state === "partial") new Notice(t("memory.partial"), 8000);
+		}
+		// A pass held from last time is only continued on the writer's say-so; tell them once where it stands.
+		if (previous === null && state === "paused") {
+			const status = this.novelMemory.status();
+			new Notice(t("main.novelMemoryHeld", { count: status.pending }), 12_000);
+		}
+		this.refreshViews();
+	}
+
+	/**
+	 * First bootstrap of the book the writer is in. Manuscript scope and canon
+	 * are recorded, not re-inferred. The pass is hours of model calls, so the
+	 * writer sees its size and says yes before anything is written or asked.
+	 */
+	async buildNovelMemory(): Promise<void> {
+		const active = this.vaultReader.activeFilePath();
+		if (!active) {
+			new Notice(t("main.novelMemoryNoActiveFile"), 8000);
+			return;
+		}
+		const files = this.vaultReader.listMarkdownFiles();
+		const scope = await this.novelMemory.measureScopeFrom(active, files);
+		const root = NovelMemoryRuntime.inferScope(active, files).manuscriptRoot || "/";
+		const confirmed = await new ConfirmModal(this.app, {
+			title: t("main.novelMemoryConfirmTitle"),
+			body: t("main.novelMemoryConfirmBody", { root, manuscripts: scope.manuscripts, canon: scope.canon, chunks: scope.chunks }),
+			confirmText: t("main.novelMemoryConfirmStart"),
+		}).openAndConfirm();
+		if (!confirmed) return;
+		const chosen = await this.novelMemory.bootstrapFrom(active, files);
+		const canon = chosen.canonPaths.length
+			? t("main.novelMemoryCanonSuffix", { canon: chosen.canonPaths.join("、") })
+			: t("main.novelMemoryCanonNone");
+		new Notice(t("main.novelMemoryBootstrapped", { root: chosen.manuscriptRoot || "/", canon }), 10_000);
+		if (!this.novelMemory.engineAvailable) new Notice(t("main.novelMemoryUnavailable"), 12_000);
+		else if (!this.novelMemory.extractionAvailable) new Notice(t("main.novelMemoryNoConnection"), 12_000);
+		this.refreshViews();
+	}
+
+	async rebuildNovelMemory(): Promise<void> {
+		if (!this.novelMemory.lifecycle.isConfigured) {
+			new Notice(t("main.novelMemoryNotConfigured"), 6000);
+			return;
+		}
+		if (!this.novelMemory.engineAvailable) {
+			new Notice(t("main.novelMemoryUnavailable"), 12_000);
+			return;
+		}
+		await this.novelMemory.rebuild();
+		this.refreshViews();
+	}
+
+	async retryNovelMemory(): Promise<void> {
+		await this.novelMemory.retry();
+		this.refreshViews();
+	}
+
+	/** Stop the running pass at the next chunk. Nothing retained so far is lost. */
+	pauseNovelMemory(): void {
+		if (!this.novelMemory.lifecycle.isConfigured) {
+			new Notice(t("main.novelMemoryNotConfigured"), 6000);
+			return;
+		}
+		this.novelMemory.pause();
+		this.refreshViews();
+	}
+
+	async resumeNovelMemory(): Promise<void> {
+		if (!this.novelMemory.lifecycle.isConfigured) {
+			new Notice(t("main.novelMemoryNotConfigured"), 6000);
+			return;
+		}
+		this.refreshViews();
+		await this.novelMemory.resume();
+		this.refreshViews();
+	}
+
+	/** The live editor state, for placing a turn in the story. */
+	activeEditorState(): { path: string | null; text: string | null; cursor: number | null } {
+		return {
+			path: this.vaultReader.activeFilePath(),
+			text: this.vaultReader.activeFileText(),
+			cursor: this.vaultReader.activeFileCursorOffset(),
+		};
 	}
 
 	private queueProjectDataEvent(

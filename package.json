@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-writing-buddy",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "WritingBuddy / 墨伴 — a writing-first AI workspace inside Obsidian.",
 	"main": "main.js",
 	"type": "module",
@@ -30,6 +30,8 @@
 		"eslint": "^10.10.0",
 		"eslint-plugin-obsidianmd": "^0.4.2",
 		"obsidian": "1.13.1",
+		"recanta-dev": "github:onezeroooo/recanta-dev#89fe7fa6c036595ed05bc3f54d58f6f0cf0b487b",
+		"sql.js": "1.14.2",
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.70.0",

@@ -4,6 +4,7 @@ import { defaultEffortFor, resolveEffort } from "../backend/effort";
 import { App, Notice, PluginSettingTab, Setting, type SettingDefinition, type SettingDefinitionItem, type SettingGroupItem } from "obsidian";
 import type WritingBuddyPlugin from "../main";
 import { getLocale, t } from "../i18n";
+import { novelProgressText } from "./novelProgress";
 import { ICONS, iconSpan } from "./icons";
 import { ConfirmModal } from "./modals";
 import { ConnectionModal } from "./connectionModal";
@@ -22,8 +23,11 @@ import {
 	ProjectInstructionsModal,
 	projectInstructionsPresentation,
 } from "./projectInstructionsModal";
-import { PROJECT_INSTRUCTIONS_PATH, type ProjectInstructionsState } from "../instructions";
+import { projectInstructionsPath, type ProjectInstructionsState } from "../instructions";
 import { markDestructive } from "./components/destructiveButton";
+import { ProjectLocationModal } from "./projectLocationModal";
+import type { ProjectRootCandidate } from "../storage/projectLocation";
+import { DEFAULT_PROJECT_ROOT } from "../storage/paths";
 import {
 	MAX_FULL_CORPUS_CONCURRENCY,
 	MAX_FULL_CORPUS_DEADLINE_MINUTES,
@@ -115,8 +119,11 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				type: "group",
 				heading: t("settings.section.projectData"),
 				items: [
+					{ name: t("settings.location.name"), render: (setting) => this.locationRow(setting, null) },
+					...this.locationExtraDefinitions(),
 					{ name: t("settings.sessions.name"), render: (setting) => this.sessionsRow(setting, null) },
 					{ name: t("settings.storage.name"), render: (setting) => this.storageRow(setting, null) },
+					{ name: t("settings.novelMemory.name"), render: (setting) => this.novelMemoryRow(setting) },
 				],
 			},
 			{
@@ -622,7 +629,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 		setting
 			.setClass("wb-project-instructions-row")
 			.setName(t("settings.instructions.name"))
-			.setDesc(t("settings.instructions.checking", { path: PROJECT_INSTRUCTIONS_PATH }));
+			.setDesc(t("settings.instructions.checking", { path: projectInstructionsPath() }));
 
 		void this.plugin.projectInstructions.load().then((state) => {
 			this.renderProjectInstructionsState(setting, state);
@@ -631,7 +638,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 				status: "invalid",
 				text: "",
 				error: "Could not load project instructions.",
-				path: PROJECT_INSTRUCTIONS_PATH,
+				path: projectInstructionsPath(),
 			});
 		});
 	}
@@ -676,7 +683,7 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 			const state = await clearProjectInstructionsAfterConfirmation(
 				() => new ConfirmModal(this.app, {
 					title: t("settings.instructions.clearTitle"),
-					body: t("settings.instructions.clearBody", { path: PROJECT_INSTRUCTIONS_PATH }),
+					body: t("settings.instructions.clearBody", { path: projectInstructionsPath() }),
 					confirmText: t("settings.instructions.clearConfirm"),
 					destructive: true,
 				}).openAndConfirm(),
@@ -869,8 +876,208 @@ export class WritingBuddySettingTab extends PluginSettingTab {
 
 	private renderProjectData(containerEl: HTMLElement): void {
 		const status = containerEl.createDiv({ cls: "wb-settings-status" });
+		this.locationRow(new Setting(containerEl), status);
+		for (const item of this.locationExtraDefinitions()) item.render(new Setting(containerEl));
 		this.sessionsRow(new Setting(containerEl), status);
 		this.storageRow(new Setting(containerEl), status);
+		this.novelMemoryRow(new Setting(containerEl));
+	}
+
+	/**
+	 * The state of the book's knowledge and the low-frequency actions on it:
+	 * build, pause or resume a pass, retry, rebuild. The feature is marked
+	 * experimental, and the row says what a build costs before it is started.
+	 */
+	private novelMemoryRow(setting: Setting): void {
+		const memory = this.plugin.novelMemory;
+		const status = memory.status();
+		const state = status.state;
+		const progress = novelProgressText(status);
+		const desc = state === "unconfigured" ? t("settings.novelMemory.unconfigured")
+			: state === "unavailable" ? t("memory.unavailable")
+			: state === "paused" ? `${t("memory.paused", { count: status.pending })}${progress ? ` · ${progress}` : ""}`
+			: status.pausedUntil ? `${t("memory.waiting", { seconds: Math.max(1, Math.ceil((Date.parse(status.pausedUntil) - Date.now()) / 1000)) })}${status.detail ? ` · ${status.detail}` : ""}`
+			: state === "building" ? `${t("memory.building")}${progress ? ` ${progress}` : ""}`
+			: state === "updating" ? `${t("memory.updating")}${progress ? ` ${progress}` : ""}`
+			: state === "rebuilding" ? `${t("memory.rebuilding")}${progress ? ` ${progress}` : ""}`
+			: state === "partial" ? `${t("memory.partial")} (${status.failures.length})`
+			: t("memory.updated");
+		setting.setName(t("settings.novelMemory.name")).setDesc(desc);
+		setting.settingEl.addClass("wb-novel-memory-row");
+		setting.nameEl.createSpan({ cls: "wb-experimental-badge", text: t("settings.experimental") });
+		// What it gives and what a build costs, on hover, whatever state the row is in.
+		iconSpan(setting.nameEl, "info", "wb-info-icon").setAttrs({
+			"aria-label": `${t("settings.novelMemory.benefit")} ${t("settings.novelMemory.cost")}`,
+			"data-tooltip-position": "top",
+			"aria-hidden": "false",
+			role: "img",
+		});
+		if (state === "unconfigured") {
+			setting.addButton((button) => button.setButtonText(t("settings.novelMemory.build")).onClick(async () => {
+				await this.plugin.buildNovelMemory();
+				this.rerender();
+			}));
+			return;
+		}
+		if (state === "paused") {
+			setting.addButton((button) => button.setButtonText(t("settings.novelMemory.resume")).setCta().onClick(async () => {
+				await this.plugin.resumeNovelMemory();
+				this.rerender();
+			}));
+		} else if (state === "building" || state === "rebuilding" || state === "updating") {
+			setting.addButton((button) => button.setButtonText(t("settings.novelMemory.pause")).onClick(() => {
+				this.plugin.pauseNovelMemory();
+				this.rerender();
+			}));
+		}
+		if (state === "partial") {
+			setting.addButton((button) => button.setButtonText(t("settings.novelMemory.retry")).onClick(async () => {
+				await this.plugin.retryNovelMemory();
+				this.rerender();
+			}));
+		}
+		setting.addButton((button) => button.setButtonText(t("settings.novelMemory.rebuild")).setDisabled(!memory.engineAvailable).onClick(async () => {
+			await this.plugin.rebuildNovelMemory();
+			this.rerender();
+		}));
+	}
+
+	// -------------------------------------------------------------------------
+	// Data folder: where it is, and the way back when it is not there.
+	//
+	// This row is the last resort behind every automatic path (following a
+	// drag, recovering after sync): whatever notice was missed, here the writer
+	// can always see where the data is and act on it. Three shapes — present,
+	// missing, and the extra rows for other roots the scan found.
+	// -------------------------------------------------------------------------
+
+	/** Scan results shown under the row, kept across re-renders of the page. */
+	private scanResults: ProjectRootCandidate[] | null = null;
+	private scanning = false;
+
+	private locationRow(row: Setting, status: HTMLElement | null): void {
+		const controller = this.plugin.projectRoot;
+		row.setName(t("settings.location.name"));
+		row.setClass("wb-location-row");
+		// The path is the point of this row, so it is the largest thing in it:
+		// body size, body colour, with the label above it in the usual place.
+		const desc = row.descEl;
+		desc.empty();
+		const path = desc.createDiv({ cls: "wb-location-path" });
+		iconSpan(path, controller.state.kind === "missing" ? "folder-x" : "folder", "wb-location-path-icon");
+		path.createSpan({ cls: "wb-location-path-text", text: controller.root });
+		const detail = desc.createDiv({ cls: "wb-location-detail" });
+		if (controller.state.kind === "missing") {
+			path.addClass("is-missing");
+			detail.setText(t("settings.location.missingDesc"));
+			row.addButton((button) => {
+				button.setButtonText(this.scanning ? t("settings.location.scanning") : t("settings.location.scan"));
+				button.setDisabled(this.scanning);
+				button.onClick(() => void this.scanForRoots(status));
+			});
+			row.addButton((button) => {
+				button.setButtonText(t("settings.location.pick"));
+				button.onClick(() => new ProjectLocationModal(this.app, this.plugin, () => this.rerender()).open());
+			});
+			row.addButton((button) => {
+				button.setButtonText(t("settings.location.createHere"));
+				button.onClick(() => void (async () => {
+					const confirmed = await new ConfirmModal(this.app, {
+						title: t("settings.location.createHereTitle", { root: controller.root }),
+						body: t("settings.location.createHereBody"),
+						confirmText: t("settings.location.createHereConfirm"),
+					}).openAndConfirm();
+					if (!confirmed) return;
+					await controller.createHere();
+					this.scanResults = null;
+					new Notice(t("settings.location.created", { root: controller.root }));
+					this.rerender();
+				})());
+			});
+			return;
+		}
+		// What is in there and the two ways to move it; counts and sizes are
+		// the rows below this one.
+		detail.setText(t("settings.location.hint", { name: controller.root.split("/").pop() ?? controller.root }));
+		row.addButton((button) => {
+			button.setButtonText(t("settings.location.move"));
+			button.onClick(() => new ProjectLocationModal(this.app, this.plugin, () => this.rerender()).open());
+		});
+	}
+
+	/** Rows for the other roots in the vault: scan results while missing, inactive roots while ready. */
+	private locationExtraDefinitions(): Array<{ name: string; searchable?: boolean; render: (setting: Setting) => void }> {
+		const controller = this.plugin.projectRoot;
+		if (controller.state.kind === "missing") {
+			const results = this.scanResults ?? controller.state.candidates;
+			if (this.scanResults !== null && results.length === 0) {
+				return [{
+					name: t("settings.location.scanEmpty"),
+					searchable: false,
+					render: (setting) => {
+						setting.setName(t("settings.location.scanEmpty")).setClass("wb-location-empty");
+					},
+				}];
+			}
+			return results.map((candidate) => ({
+				name: candidate.root,
+				searchable: false,
+				render: (setting: Setting) => this.candidateRow(setting, candidate),
+			}));
+		}
+		return controller.inactiveRoots.map((candidate) => ({
+			name: t("settings.location.inactiveName", { path: candidate.root }),
+			searchable: false,
+			render: (setting: Setting) => this.inactiveRootRow(setting, candidate),
+		}));
+	}
+
+	private candidateRow(setting: Setting, candidate: ProjectRootCandidate): void {
+		setting.setClass("wb-location-candidate");
+		setting.nameEl.empty();
+		setting.nameEl.createEl("code", { text: candidate.root });
+		const detail = candidate.updatedAt !== null
+			? t("settings.location.candidate", { count: candidate.conversations, date: formatDate(candidate.updatedAt) })
+			: t("settings.location.candidateNoDate", { count: candidate.conversations });
+		const hint = candidate.root === DEFAULT_PROJECT_ROOT && this.plugin.projectRoot.root !== DEFAULT_PROJECT_ROOT
+			? ` ${t("settings.location.candidateDefaultHint")}`
+			: "";
+		setting.setDesc(detail + hint);
+		setting.addButton((button) => {
+			button.setButtonText(t("settings.location.use")).setCta();
+			button.onClick(() => void (async () => {
+				await this.plugin.projectRoot.useCandidate(candidate.root);
+				this.scanResults = null;
+				new Notice(t("settings.location.switched", { root: candidate.root }));
+				this.rerender();
+			})());
+		});
+	}
+
+	private inactiveRootRow(setting: Setting, candidate: ProjectRootCandidate): void {
+		setting.setClass("wb-location-candidate");
+		setting.setName(t("settings.location.inactiveName", { path: candidate.root }));
+		setting.setDesc(t("settings.location.inactiveDesc", { count: candidate.conversations }));
+		setting.addButton((button) => {
+			button.setButtonText(t("settings.location.use"));
+			button.onClick(() => void (async () => {
+				await this.plugin.projectRoot.useCandidate(candidate.root);
+				new Notice(t("settings.location.switched", { root: candidate.root }));
+				this.rerender();
+			})());
+		});
+	}
+
+	private async scanForRoots(status: HTMLElement | null): Promise<void> {
+		this.scanning = true;
+		this.rerender();
+		try {
+			this.scanResults = await this.plugin.projectRoot.scan();
+			if (this.scanResults.length === 0) status?.setText(t("settings.location.scanEmpty"));
+		} finally {
+			this.scanning = false;
+			this.rerender();
+		}
 	}
 
 	/** How many conversations there are, and a way to drop the archived ones. */

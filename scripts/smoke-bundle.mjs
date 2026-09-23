@@ -47,6 +47,10 @@ const obsidianStub = {
 	Notice: class {},
 	MarkdownView: class {},
 	TFile: class {},
+	TFolder: class {},
+	AbstractInputSuggest: class {},
+	SuggestModal: class {},
+	prepareFuzzySearch: () => () => null,
 	normalizePath: (value) => value,
 };
 

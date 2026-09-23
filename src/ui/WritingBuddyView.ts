@@ -26,6 +26,7 @@
 
 import { ItemView, Notice, type Editor, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
+import { novelProgressText } from "./novelProgress";
 import { displayTitle } from "../session/titles";
 
 import type WritingBuddyPlugin from "../main";
@@ -102,7 +103,7 @@ import {
 	REPLY_TIME_REFRESH_MS,
 } from "./components/activity";
 import { clearAttachmentPopovers } from "./components/attachmentChip";
-import { PROJECT_ROOT } from "../storage/paths";
+import { projectPaths } from "../storage/paths";
 import { connectionSnapshot } from "../connections/types";
 import {
 	effectiveComposerPreferences,
@@ -407,6 +408,8 @@ export class WritingBuddyView extends ItemView {
 			onOpenSettings: () => this.plugin.openSettings(),
 		});
 
+		this.renderMemoryStatus(container);
+
 		const scroll = container.createDiv({ cls: "wb-scroll" });
 		this.scrollEl = scroll;
 		scroll.addEventListener("scroll", () => {
@@ -427,8 +430,10 @@ export class WritingBuddyView extends ItemView {
 		});
 		const thread = scroll.createDiv({ cls: "wb-thread" });
 
-		if (!sessions.isLoaded) {
-			this.renderNotice(thread, t("view.loadingSessions"), t("view.loadingFrom", { path: `${PROJECT_ROOT}/conversations/` }));
+		if (this.plugin.projectRoot.state.kind === "missing") {
+			this.renderRootMissing(thread);
+		} else if (!sessions.isLoaded) {
+			this.renderNotice(thread, t("view.loadingSessions"), t("view.loadingFrom", { path: `${projectPaths.conversationsDir}/` }));
 		} else if (this.plugin.loadError) {
 			this.renderNotice(thread, t("view.loadFailed"), this.plugin.loadError);
 		} else if (!session || session.messages.length === 0) {
@@ -650,6 +655,19 @@ export class WritingBuddyView extends ItemView {
 		const notice = parent.createDiv({ cls: "wb-notice" });
 		notice.createDiv({ cls: "wb-notice-title", text: title });
 		notice.createDiv({ cls: "wb-notice-body", text: body });
+	}
+
+	/**
+	 * The data folder is not where it was recorded. Nothing is created for the
+	 * writer here (see `ProjectRootController`); the panel says so and points
+	 * at the one place with the tools to resolve it.
+	 */
+	private renderRootMissing(parent: HTMLElement): void {
+		const notice = parent.createDiv({ cls: "wb-empty" });
+		notice.createDiv({ cls: "wb-empty-title", text: t("view.rootMissingTitle") });
+		notice.createDiv({ cls: "wb-empty-body", text: t("view.rootMissingBody", { root: this.plugin.projectRoot.root }) });
+		const open = notice.createEl("button", { cls: "wb-empty-action mod-cta", text: t("view.openSettings"), attr: { type: "button" } });
+		open.addEventListener("click", () => this.plugin.openSettings());
 	}
 
 	private renderEmptyState(parent: HTMLElement): void {
@@ -906,6 +924,69 @@ export class WritingBuddyView extends ItemView {
 	 * deliberately ignored: until this device changes a session, its own new-
 	 * conversation default is the visible and executable selection.
 	 */
+	/** Set by the whole-manuscript command; consumed by the next send and never stored. */
+	private wholeManuscriptOnce = false;
+
+	/**
+	 * Run the Composer's question once with complete coverage. An explicit
+	 * operation with its own entry point, so ordinary turns never carry it.
+	 */
+	async sendWholeManuscript(): Promise<void> {
+		if (!this.composerValue.trim()) {
+			new Notice(t("view.wholeManuscriptEmpty"), 8000);
+			return;
+		}
+		this.wholeManuscriptOnce = true;
+		try {
+			await this.send();
+		} finally {
+			this.wholeManuscriptOnce = false;
+		}
+	}
+
+	/** What the book knows that this turn should see; null when memory has nothing to add. */
+	private async novelMemoryFor(turn: Readonly<TurnPlan>): Promise<EvidenceItem | null> {
+		if (turn.context.execution === "full-current-manuscript") return null;
+		// Test doubles of the plugin may carry no memory at all; a turn without it is the turn as it always was.
+		if (typeof this.plugin.activeEditorState !== "function" || !this.plugin.novelMemory) return null;
+		const editor = this.plugin.activeEditorState();
+		const path = editor.path ?? turn.currentFile ?? null;
+		return this.plugin.novelMemory.contextFor({
+			question: turn.question,
+			activeFilePath: path,
+			activeFileText: editor.path === path ? editor.text : null,
+			cursorOffset: editor.path === path ? editor.cursor : null,
+		});
+	}
+
+	/** One quiet line while knowledge is being built or updated, a retry when some of it could not be. */
+	private renderMemoryStatus(container: HTMLElement): void {
+		const status = this.plugin.novelMemory.status();
+		const running = status.state === "building" || status.state === "updating" || status.state === "rebuilding";
+		const transient = running || status.state === "partial" || status.state === "paused";
+		if (!transient && status.awaitingManuscript === 0) return;
+		const line = container.createDiv({ cls: `wb-memory-status is-${status.state}`, attr: { role: "status" } });
+		const progress = novelProgressText(status);
+		const label = status.state === "partial"
+			? t("memory.partial")
+			: status.state === "paused" ? t("memory.paused", { count: status.pending })
+			: status.state === "building" ? `${t("memory.building")}${progress ? ` ${progress}` : ""}`
+			: status.state === "rebuilding" ? `${t("memory.rebuilding")}${progress ? ` ${progress}` : ""}`
+			: status.state === "updating" ? `${t("memory.updating")}${progress ? ` ${progress}` : ""}`
+			: t("memory.awaiting", { count: status.awaitingManuscript });
+		line.createSpan({ cls: "wb-memory-status-label", text: label });
+		if (status.state === "partial") {
+			const retry = line.createEl("button", { cls: "wb-memory-action", text: t("memory.retry"), attr: { type: "button" } });
+			retry.addEventListener("click", () => void this.plugin.retryNovelMemory());
+		} else if (status.state === "paused") {
+			const resume = line.createEl("button", { cls: "wb-memory-action", text: t("memory.resume"), attr: { type: "button" } });
+			resume.addEventListener("click", () => void this.plugin.resumeNovelMemory());
+		} else if (running) {
+			const pause = line.createEl("button", { cls: "wb-memory-action", text: t("memory.pause"), attr: { type: "button" } });
+			pause.addEventListener("click", () => this.plugin.pauseNovelMemory());
+		}
+	}
+
 	private effectivePreferences(session: ConversationSession | null): SessionPreferences {
 		const preferences = effectiveComposerPreferences(
 			session ? this.plugin.vaultState.sessionPreferences(session.id) : null,
@@ -1174,8 +1255,10 @@ export class WritingBuddyView extends ItemView {
 		// with it. Reaching the same Skill by typing is a guess about their
 		// sentence, however good a one, so it does not carry the same authority.
 		const pressed = this.pendingSkill !== null && route.skill?.id === this.pendingSkill.id;
+		const forcedMode = this.wholeManuscriptOnce;
+		this.wholeManuscriptOnce = false;
 		const context = planContext({
-			mode: currentPreferences.contextDepth,
+			mode: forcedMode ? "full" : currentPreferences.contextDepth,
 			query: question,
 			...(skill ? { skill } : {}),
 			selectionChars: selection?.charCount ?? 0,
@@ -1465,8 +1548,10 @@ export class WritingBuddyView extends ItemView {
 		// One evidence list, used both to build the request and to resolve the
 		// citations that come back. Two derivations could drift; this cannot.
 		const baseEvidence = buildEvidence(context);
-		const evidence = mergeHistoricalSelectionEvidence(baseEvidence,
-			turn.historicalSelections);
+		const evidence = withNovelMemory(
+			mergeHistoricalSelectionEvidence(baseEvidence, turn.historicalSelections),
+			await this.novelMemoryFor(turn),
+		);
 		accountForAddedEvidence(context, addedEvidence(baseEvidence, evidence));
 		if (context.report) {
 			context.report.sources = evidence.map((item) => ({
@@ -1769,9 +1854,9 @@ export class WritingBuddyView extends ItemView {
 		if (!this.canUseLease(lease)) return;
 
 		const baseEvidence = buildEvidence(initialContext);
-		const initialEvidence = mergeHistoricalSelectionEvidence(
-			baseEvidence,
-			turn.historicalSelections,
+		const initialEvidence = withNovelMemory(
+			mergeHistoricalSelectionEvidence(baseEvidence, turn.historicalSelections),
+			await this.novelMemoryFor(turn),
 		);
 		accountForAddedEvidence(initialContext, addedEvidence(baseEvidence, initialEvidence));
 		if (turn.selection && replacesSelection(turn.skill) && !turn.conversational) {
@@ -2624,6 +2709,16 @@ function evidenceIdentity(item: EvidenceItem): string {
 
 function selectionEvidenceIdentity(selection: SelectionAttachment): string {
 	return `${selection.filePath}:${selection.from.line}:${selection.from.ch}:${selection.to.line}:${selection.to.ch}:${selection.text}`;
+}
+
+/**
+ * The book's knowledge joins the turn as one more admitted evidence item,
+ * numbered after everything the turn already carries. Absent when there is
+ * no book, no engine, or nothing relevant.
+ */
+export function withNovelMemory(evidence: EvidenceItem[], memory: EvidenceItem | null): EvidenceItem[] {
+	if (!memory || evidence.length >= MAX_EVIDENCE_ITEMS) return evidence;
+	return [...evidence, { ...memory, id: `S${evidence.length + 1}` }];
 }
 
 function addedEvidence(base: readonly EvidenceItem[], merged: readonly EvidenceItem[]): EvidenceItem[] {
