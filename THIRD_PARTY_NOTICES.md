@@ -15,11 +15,16 @@ The released `main.js` is built from the TypeScript sources under `src/` plus tw
 | `@codemirror/state` | Editor API used through Obsidian; external at build time | MIT |
 | `@codemirror/view` | Editor API used through Obsidian; external at build time | MIT |
 | `@types/node` | Type definitions | MIT |
+| `moment`, `style-mod` | Type definitions reached by the Obsidian and CodeMirror declarations | MIT |
 | `tslib` | TypeScript helper library; not imported with `importHelpers: false` | 0BSD |
 
 ## Copied source code
 
 The built files of the Recanta memory kernel are carried in this repository under `vendor/recanta/`, copied verbatim from one exact commit of the author’s own engine repository; `recanta-manifest.json` records that commit and a hash of those files. They are the author’s own work and are **not** covered by this repository’s MIT licence: `vendor/recanta/LICENSE` states their terms, which allow reading them, building this repository, and redistributing them verbatim as part of an unmodified Writing Buddy, and reserve every other use. They are here so that the repository installs, type-checks and builds for anyone who clones it. No source file in Writing Buddy was copied from a project the author does not own; sql.js is consumed as a package and bundled by esbuild.
+
+## Vendored type definitions
+
+The declaration files under `vendor/types/` are the APIs this plugin is written against — Obsidian's, CodeMirror's, and the two packages their declarations reach for. Obsidian supplies these APIs at run time, so none of this code is in `main.js`; they are carried here only so that the repository type-checks without installing anything, which is how automated review reads it. Each is copied verbatim from the exactly pinned version in `package.json`, remains under its own MIT licence and its own authors' copyright, and is listed with its version in `vendor/types/VENDORED.md`. A test holds each copy to the installed package byte for byte.
 
 ## Attribution obligations
 

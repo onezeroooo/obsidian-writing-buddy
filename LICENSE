@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This licence covers Writing Buddy itself. It does not cover the files under
-`vendor/recanta/`, which are the built output of the author's own memory kernel
-and carry their own terms in `vendor/recanta/LICENSE`. See
-`THIRD_PARTY_NOTICES.md`.

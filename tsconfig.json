@@ -3,7 +3,12 @@
 		"baseUrl": ".",
 		"paths": {
 			"recanta-dev": ["./vendor/recanta/dist/src/index.d.ts"],
-			"recanta-dev/sqljs": ["./vendor/recanta/dist/src/drivers/sqljs.d.ts"]
+			"recanta-dev/sqljs": ["./vendor/recanta/dist/src/drivers/sqljs.d.ts"],
+			"obsidian": ["./vendor/types/obsidian.d.ts"],
+			"@codemirror/state": ["./vendor/types/state.d.ts"],
+			"@codemirror/view": ["./vendor/types/view.d.ts"],
+			"style-mod": ["./vendor/types/style-mod.d.ts"],
+			"moment": ["./vendor/types/moment.d.ts"]
 		},
 		"module": "ESNext",
 		"target": "ES2022",
